@@ -75,3 +75,8 @@ Windows:
 * make create_environment
 * activate.bat
 * make requirements
+
+Data
+------------
+
+Dataset 1: [Thingi10k](https://arxiv.org/pdf/1605.04797.pdf) ([download link](https://drive.google.com/file/d/0B4_KyPW4T9oGRHdMTGZnVDFHLUU/edit) WARNING: it is 9gb _compressed_ and ~32gb _uncompressed_)
