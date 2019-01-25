@@ -55,3 +55,23 @@ Project Organization
 --------
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+
+Getting Started
+------------
+
+Make sure you have Python 3.6+ installed: https://www.python.org/downloads/
+
+Linux:
+
+* make create_environment
+* source .3d-form/Scripts/activate
+* make requirements
+
+Windows:
+
+* install git with unix extensions
+* install chocolatey from https://chocolatey.org/
+* install make with "choco install make"
+* make create_environment
+* activate.bat
+* make requirements
