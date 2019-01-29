@@ -40,6 +40,7 @@ notebook==5.7.4
 numpy==1.16.0
 numpy-stl==2.9.0
 packaging==19.0
+pandas==0.24.0
 pandocfilters==1.4.2
 parso==0.3.2
 pathlib2==2.3.3
