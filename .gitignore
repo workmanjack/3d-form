@@ -2,6 +2,7 @@
 data/external/*
 data/raw/*
 notebooks/_output/*
+__pycache__
 *.sublime-project
 *.sublime-workspace
 *.ipynb_checkpoints

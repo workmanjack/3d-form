@@ -59,21 +59,23 @@ def thingi10k_image(obj_id, dest):
     return dest
 
 
-def make_thingi10k_index(index_path):
+def make_thingi10k_index(data_dir, index_path):
     """
     Constructs a csv index of thingi10k objects
     """
     rows = list()
     header = ['file', 'name', 'num_vertices']
 
-    mesh_dir = '../data/external/Thingi10k/raw_meshes'
-    raw_dir = '../data/raw'
-    proc_dir = '../data/processed'
+    mesh_dir = os.path.join(data_dir, 'external/Thingi10k/raw_meshes')
+    raw_dir = os.path.join(data_dir, 'raw')
+    proc_dir = os.path.join(data_dir, 'processed')
 
     fields = list()
     data = list()
 
-    for path in os.listdir(mesh_dir)[:10]:
+    count = 0
+
+    for path in os.listdir(mesh_dir):
 
         # quick check that we are reading something that we care about
         if not path.endswith('.stl'):
@@ -86,19 +88,26 @@ def make_thingi10k_index(index_path):
         # get api data
         file_data = thingi10k_api_data(obj_id)
         stl_name = '{}.json'.format(obj_id)
-        with open(os.path.join(raw_dir, stl_name), 'w') as outfile:
-            json.dump(data, outfile)
 
         # gather object images
         img_name = '{}.png'.format(obj_id)
         dest = os.path.join(raw_dir, img_name)
-        dest = thingi10k_image(obj_id, dest)
+        if os.path.exists(dest):
+            print('{} already exists'.format(dest))
+        else:
+            dest = thingi10k_image(obj_id, dest)
 
-        # done
+        # write json
         file_data['stl_file'] = stl_name
         file_data['img_file'] = img_name
+        dest = os.path.join(raw_dir, stl_name)
+        with open(dest, 'w') as outfile:
+            json.dump(file_data, outfile)
+
+        # save index row
         fields = list(set(fields).union(set(file_data.keys())))
         data.append(file_data)
+        count += 1
 
     # write index
     # index_path = '_output/thingi10k.csv'
@@ -116,3 +125,6 @@ def make_thingi10k_index(index_path):
                         obj[f] = None
 
             writer.writerow(obj)
+
+    print('{} objects processed'.format(count))
+    print('Index written to {}'.format(index_path))
