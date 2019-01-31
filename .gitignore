@@ -2,6 +2,7 @@
 data/external/*
 data/raw/*
 notebooks/_output/*
+notebooks/MNIST_data
 __pycache__
 *.sublime-project
 *.sublime-workspace

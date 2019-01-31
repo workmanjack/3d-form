@@ -6,7 +6,7 @@
 Getting Started
 ------------
 
-Make sure you have Python 3.6+ installed: https://www.python.org/downloads/
+Make sure you have Python 3.6.x installed (Tensorflow doesn't support 3.7): https://www.python.org/downloads/
 
 Linux:
 
