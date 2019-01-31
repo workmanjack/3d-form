@@ -6,6 +6,7 @@ from data.thingi10k import thingi10k_batch_generator
 
 
 # python packages
+import pandas as pd
 import numpy as np
 import unittest
 import os
@@ -31,7 +32,8 @@ class TestThingi10k(unittest.TestCase):
 
     def test_thingi10k_batch_generator_even_batches(self):
         batches = list()
-        for batch in thingi10k_batch_generator(TEST_INDEX, 5):
+        df = pd.read_csv(TEST_INDEX)
+        for batch in thingi10k_batch_generator(df, 5):
             batches.append(batch)
         self.assertEqual(len(batches), 2)
         self.assertEqual(len(batches[0]), 5)
@@ -39,13 +41,43 @@ class TestThingi10k(unittest.TestCase):
 
     def test_thingi10k_batch_generator_uneven_batches(self):
         batches = list()
-        for batch in thingi10k_batch_generator(TEST_INDEX, 3):
+        df = pd.read_csv(TEST_INDEX)
+        for batch in thingi10k_batch_generator(df, 3):
             batches.append(batch)
         self.assertEqual(len(batches), 4)
         self.assertEqual(len(batches[0]), 3)
         self.assertEqual(len(batches[1]), 3)
         self.assertEqual(len(batches[2]), 3)
         self.assertEqual(len(batches[3]), 1)
+
+    def test_thingi10k_batch_generator_flat_true_pad_length_none(self):
+        batches = list()
+        df = pd.read_csv(TEST_INDEX)
+        for batch in thingi10k_batch_generator(df, 5, flat=True):
+            batches.append(batch)
+        self.assertEqual(len(batches), 2)
+        self.assertEqual(len(batches[0][0]), 270*3*3)
+
+    def test_thingi10k_batch_generator_flat_true_pad_length_given(self):
+        batches = list()
+        pad_length = 50000
+        df = pd.read_csv(TEST_INDEX)
+        for batch in thingi10k_batch_generator(df, 5, flat=True, pad_length=pad_length):
+            batches.append(batch)
+        self.assertEqual(len(batches), 2)
+        self.assertEqual(len(batches[0][0]), pad_length)
+        self.assertEqual(len(batches[1][2]), pad_length)
+
+    def test_thingi10k_batch_generator_flat_true_pad_length_truncate(self):
+        batches = list()
+        pad_length = 1
+        df = pd.read_csv(TEST_INDEX)
+        for batch in thingi10k_batch_generator(df, 5, flat=True, pad_length=pad_length):
+            batches.append(batch)
+        self.assertEqual(len(batches), 2)
+        self.assertEqual(len(batches[0][0]), pad_length)
+        self.assertEqual(len(batches[1][2]), pad_length)
+
 
 
 class TestStl(unittest.TestCase):
