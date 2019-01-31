@@ -1,3 +1,9 @@
+# project imports
+from data.stl import read_mesh_vectors
+from data import RAW_DIR, THINGI10K_STL_DIR
+
+
+# python packages
 import urllib.request
 import pandas as pd
 import traceback
@@ -62,6 +68,18 @@ def download_thingi10k_image(obj_id, dest):
     return dest
 
 
+def thingi10k_batch_generator(index_csv, batch_size):
+    df = pd.read_csv(index_csv)
+    batch = list()
+    for i, stl_file in enumerate(df['stl_file']):
+        stl_path = os.path.join(THINGI10K_STL_DIR, stl_file)
+        vectors = read_mesh_vectors(stl_path)
+        batch.append(vectors)
+        if (i+1) % batch_size == 0 or (i+1) == len(df):
+            yield batch
+            batch = list()
+
+
 def make_thingi10k_index(data_dir, index_path, limit=None):
     """
     Constructs a csv index of thingi10k objects
@@ -101,7 +119,7 @@ def make_thingi10k_index(data_dir, index_path, limit=None):
 
             # get api data
             file_data = download_thingi01k_api_data(obj_id)
-            stl_name = '{}.json'.format(obj_id)
+            json_name = '{}.json'.format(obj_id)
 
             # gather object images
             img_name = '{}.png'.format(obj_id)
@@ -112,9 +130,10 @@ def make_thingi10k_index(data_dir, index_path, limit=None):
                 dest = download_thingi10k_image(obj_id, dest)
 
             # write json
-            file_data['stl_file'] = stl_name
+            file_data['stl_file'] = path
+            file_data['json_file'] = json_name
             file_data['img_file'] = img_name
-            dest = os.path.join(raw_dir, stl_name)
+            dest = os.path.join(raw_dir, json_name)
             with open(dest, 'w') as outfile:
                 json.dump(file_data, outfile)
 
@@ -147,12 +166,3 @@ def make_thingi10k_index(data_dir, index_path, limit=None):
     print('{} objects processed'.format(count))
     print('Index written to {}'.format(index_path))
 
-
-def thingi10k_batch_generator(index_csv, batch_size):
-    df = pd.read_csv(index_csv)
-    batch = list()
-    for i, stl_file in enumerate(df['stl_file']):
-        for i in batch_size:
-            stl_path = os.path.join(RAW_DIR, stl_file)
-            batch.append(stl_path)
-    return

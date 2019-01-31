@@ -2,6 +2,10 @@ import os
 
 
 DATA_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)), '../../data')
-THINGI10K_INDEX = os.path.join(DATA_DIR, 'processed/thingi10k_index.csv')
-THINGI10K_INDEX_100 = os.path.join(DATA_DIR, 'processed/thingi10k_index_100.csv')
+PROCESSED_DIR = os.path.join(DATA_DIR, 'processed')
+EXTERNAL_DIR = os.path.join(DATA_DIR, 'external')
+THINGI10K_STL_DIR = os.path.join(EXTERNAL_DIR, 'Thingi10k/raw_meshes')
+THINGI10K_INDEX = os.path.join(PROCESSED_DIR, 'thingi10k_index.csv')
+THINGI10K_INDEX_10 = os.path.join(PROCESSED_DIR, 'thingi10k_index_10.csv')
+THINGI10K_INDEX_100 = os.path.join(PROCESSED_DIR, 'thingi10k_index_100.csv')
 RAW_DIR = os.path.join(DATA_DIR, 'raw')
