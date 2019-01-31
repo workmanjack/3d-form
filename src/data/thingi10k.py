@@ -1,4 +1,5 @@
 import urllib.request
+import pandas as pd
 import traceback
 import requests
 import shutil
@@ -6,9 +7,6 @@ import json
 import time
 import csv
 import os
-
-
-THINGI10K_INDEX = os.path.join(os.path.realpath(__file__), *'../../data/processed/thingi10k_index.csv'.split('/'))
 
 
 def api_json(url):
@@ -64,7 +62,7 @@ def download_thingi10k_image(obj_id, dest):
     return dest
 
 
-def make_thingi10k_index(data_dir, index_path):
+def make_thingi10k_index(data_dir, index_path, limit=None):
     """
     Constructs a csv index of thingi10k objects
     """
@@ -84,7 +82,10 @@ def make_thingi10k_index(data_dir, index_path):
 
     start = time.time()
 
-    for path in os.listdir(mesh_dir):
+    files = os.listdir(mesh_dir)
+    files = files if not limit else files[:limit]
+
+    for path in files:
 
         try:
 
@@ -122,10 +123,9 @@ def make_thingi10k_index(data_dir, index_path):
             data.append(file_data)
             count += 1
 
-        except Exception as exc:
+        except Exception:
             print('Problem!')
-            traceback.print_tb(err.__traceback__)
-
+            print(traceback.format_exc())
 
     # write index
     # index_path = '_output/thingi10k.csv'
@@ -148,5 +148,11 @@ def make_thingi10k_index(data_dir, index_path):
     print('Index written to {}'.format(index_path))
 
 
-def make_thingi10k_dataset():
+def thingi10k_batch_generator(index_csv, batch_size):
+    df = pd.read_csv(index_csv)
+    batch = list()
+    for i, stl_file in enumerate(df['stl_file']):
+        for i in batch_size:
+            stl_path = os.path.join(RAW_DIR, stl_file)
+            batch.append(stl_path)
     return

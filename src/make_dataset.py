@@ -6,11 +6,8 @@ import click
 import os
 
 
+from data import DATA_DIR, THINGI10K_INDEX, THINGI10K_INDEX_100
 from data.thingi10k import make_thingi10k_index
-
-
-DATA_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)), '../data')
-THINGI10K_INDEX = os.path.join(DATA_DIR, 'processed/thingi10k_index.csv')
 
 
 # @click.command()
@@ -24,6 +21,7 @@ def main():
     # logger = logging.getLogger(__name__)
     # logger.info('making final data set from raw data')
     make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, 100)
 
 
 if __name__ == '__main__':
