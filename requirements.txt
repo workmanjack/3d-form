@@ -1,4 +1,6 @@
+absl-py==0.7.0
 alabaster==0.7.12
+astor==0.7.1
 awscli==1.16.94
 Babel==2.6.0
 backcall==0.1.0
@@ -15,6 +17,9 @@ defusedxml==0.5.0
 docutils==0.14
 entrypoints==0.3
 flake8==3.6.0
+gast==0.2.2
+grpcio==1.18.0
+h5py==2.9.0
 idna==2.8
 imagesize==1.1.0
 ipykernel==5.1.0
@@ -29,7 +34,10 @@ jupyter==1.0.0
 jupyter-client==5.2.4
 jupyter-console==6.0.0
 jupyter-core==4.4.0
+Keras-Applications==1.0.7
+Keras-Preprocessing==1.0.8
 kiwisolver==1.0.1
+Markdown==3.0.1
 MarkupSafe==1.1.0
 matplotlib==3.0.2
 mccabe==0.6.1
@@ -47,6 +55,7 @@ pathlib2==2.3.3
 pickleshare==0.7.5
 prometheus-client==0.5.0
 prompt-toolkit==2.0.8
+protobuf==3.6.1
 pyasn1==0.4.5
 pycodestyle==2.4.0
 pyflakes==2.0.0
@@ -68,6 +77,10 @@ six==1.12.0
 snowballstemmer==1.2.1
 Sphinx==1.8.3
 sphinxcontrib-websupport==1.1.0
+tensorboard==1.12.2
+tensorflow==1.12.0
+tensorflow-probability==0.5.0
+termcolor==1.1.0
 terminado==0.8.1
 testpath==0.4.2
 tornado==5.1.1
@@ -75,4 +88,5 @@ traitlets==4.3.2
 urllib3==1.24.1
 wcwidth==0.1.7
 webencodings==0.5.1
+Werkzeug==0.14.1
 widgetsnbextension==3.4.2
