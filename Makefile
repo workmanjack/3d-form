@@ -29,7 +29,7 @@ requirements: test_environment
 
 ## Make Dataset
 data: requirements
-	$(PYTHON_INTERPRETER) src/data/make_dataset.py
+	$(PYTHON_INTERPRETER) src/make_dataset.py
 
 ## Delete all compiled Python files
 clean:
@@ -78,6 +78,9 @@ endif
 ## Test python environment is setup correctly
 test_environment:
 	$(PYTHON_INTERPRETER) test_environment.py
+
+test:
+	$(PYTHON_INTERPRETER) -m unittest discover src/tests
 
 #################################################################################
 # PROJECT RULES                                                                 #

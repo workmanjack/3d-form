@@ -8,6 +8,9 @@ import csv
 import os
 
 
+THINGI10K_INDEX = os.path.join(os.path.realpath(__file__), *'../../data/processed/thingi10k_index.csv'.split('/'))
+
+
 def api_json(url):
     """
     Returns json data from the provided url
@@ -29,7 +32,7 @@ def api_json(url):
     return data
 
 
-def thingi10k_api_data(obj_id):
+def download_thingi01k_api_data(obj_id):
     """
     Returns api data of specified thingi10k object
 
@@ -40,7 +43,7 @@ def thingi10k_api_data(obj_id):
     return api_json(url)
 
 
-def thingi10k_image(obj_id, dest):
+def download_thingi10k_image(obj_id, dest):
     """
     Returns an image file for the specified thingi10k object
 
@@ -65,6 +68,8 @@ def make_thingi10k_index(data_dir, index_path):
     """
     Constructs a csv index of thingi10k objects
     """
+    print('Making thingi10k index from data in {} and saving to {}'.format(data_dir, index_path))
+
     rows = list()
     header = ['file', 'name', 'num_vertices']
 
@@ -94,7 +99,7 @@ def make_thingi10k_index(data_dir, index_path):
             obj_id = os.path.splitext(path)[0]
 
             # get api data
-            file_data = thingi10k_api_data(obj_id)
+            file_data = download_thingi01k_api_data(obj_id)
             stl_name = '{}.json'.format(obj_id)
 
             # gather object images
@@ -103,7 +108,7 @@ def make_thingi10k_index(data_dir, index_path):
             if os.path.exists(dest):
                 print('{} already exists'.format(dest))
             else:
-                dest = thingi10k_image(obj_id, dest)
+                dest = download_thingi10k_image(obj_id, dest)
 
             # write json
             file_data['stl_file'] = stl_name
@@ -141,3 +146,7 @@ def make_thingi10k_index(data_dir, index_path):
 
     print('{} objects processed'.format(count))
     print('Index written to {}'.format(index_path))
+
+
+def make_thingi10k_dataset():
+    return

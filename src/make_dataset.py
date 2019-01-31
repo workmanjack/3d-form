@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
-import click
-import logging
-from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
+from pathlib import Path
+import logging
+import click
+import os
 
 
-from thingi10k import make_thingi10k_index
+from data.thingi10k import make_thingi10k_index
+
+
+DATA_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)), '../data')
+THINGI10K_INDEX = os.path.join(DATA_DIR, 'processed/thingi10k_index.csv')
 
 
 # @click.command()
@@ -18,7 +23,7 @@ def main():
     """
     # logger = logging.getLogger(__name__)
     # logger.info('making final data set from raw data')
-    make_thingi10k_index('data', 'data/processed/thingi10k_index.csv')
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
 
 
 if __name__ == '__main__':
