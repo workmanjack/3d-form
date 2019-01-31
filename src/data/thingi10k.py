@@ -1,7 +1,9 @@
 import urllib.request
+import traceback
 import requests
 import shutil
 import json
+import time
 import csv
 import os
 
@@ -73,41 +75,52 @@ def make_thingi10k_index(data_dir, index_path):
     fields = list()
     data = list()
 
-    count = 0
+    count = 1
+
+    start = time.time()
 
     for path in os.listdir(mesh_dir):
 
-        # quick check that we are reading something that we care about
-        if not path.endswith('.stl'):
-            print('not an stl file: {}'.format(path))
-            continue
+        try:
 
-        # get file ids
-        obj_id = os.path.splitext(path)[0]
+            # quick check that we are reading something that we care about
+            if not path.endswith('.stl'):
+                print('not an stl file: {}'.format(path))
+                continue
 
-        # get api data
-        file_data = thingi10k_api_data(obj_id)
-        stl_name = '{}.json'.format(obj_id)
+            print('{}: {}'.format(count, path))
 
-        # gather object images
-        img_name = '{}.png'.format(obj_id)
-        dest = os.path.join(raw_dir, img_name)
-        if os.path.exists(dest):
-            print('{} already exists'.format(dest))
-        else:
-            dest = thingi10k_image(obj_id, dest)
+            # get file ids
+            obj_id = os.path.splitext(path)[0]
 
-        # write json
-        file_data['stl_file'] = stl_name
-        file_data['img_file'] = img_name
-        dest = os.path.join(raw_dir, stl_name)
-        with open(dest, 'w') as outfile:
-            json.dump(file_data, outfile)
+            # get api data
+            file_data = thingi10k_api_data(obj_id)
+            stl_name = '{}.json'.format(obj_id)
 
-        # save index row
-        fields = list(set(fields).union(set(file_data.keys())))
-        data.append(file_data)
-        count += 1
+            # gather object images
+            img_name = '{}.png'.format(obj_id)
+            dest = os.path.join(raw_dir, img_name)
+            if os.path.exists(dest):
+                print('{} already exists'.format(dest))
+            else:
+                dest = thingi10k_image(obj_id, dest)
+
+            # write json
+            file_data['stl_file'] = stl_name
+            file_data['img_file'] = img_name
+            dest = os.path.join(raw_dir, stl_name)
+            with open(dest, 'w') as outfile:
+                json.dump(file_data, outfile)
+
+            # save index row
+            fields = list(set(fields).union(set(file_data.keys())))
+            data.append(file_data)
+            count += 1
+
+        except Exception as exc:
+            print('Problem!')
+            traceback.print_tb(err.__traceback__)
+
 
     # write index
     # index_path = '_output/thingi10k.csv'
