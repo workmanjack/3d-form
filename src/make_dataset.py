@@ -22,8 +22,8 @@ def main():
     # logger.info('making final data set from raw data')
     # make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_10, 10)
     # make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, 100)
-    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000, get_img=False)
-    # make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
+    #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000, get_img=False)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
 
 
 if __name__ == '__main__':
