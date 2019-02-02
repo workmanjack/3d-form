@@ -1,7 +1,7 @@
 # project imports
 import env
 from data import DATA_DIR, THINGI10K_INDEX, PROCESSED_DIR
-from data.stl import read_mesh_vectors
+from data.stl import read_mesh_vectors, write_stl_normal_vectors
 from data.thingi10k import thingi10k_batch_generator
 
 
@@ -100,3 +100,7 @@ class TestStl(unittest.TestCase):
         ])
         actual = read_mesh_vectors(TEST_STL)
         self.assertEqual(expected.all(), actual.all())
+
+    def test_compute_normal_vectors(self):
+        vectors = read_mesh_vectors(TEST_STL)
+        write_stl_normal_vectors(vectors)

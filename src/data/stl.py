@@ -41,3 +41,13 @@ def read_mesh_vectors(stl_file):
         return None
     model = mesh.Mesh.from_file(stl_file)
     return model.vectors
+
+def write_stl_normal_vectors(vertex_vectors, output='write_stl_normal_vectors.stl'):
+    """
+    Args:
+        vertex_vectors: np.array with shape 3x3
+    """
+    # apparently numpy-stl has an update_normals function
+    model = mesh.Mesh(data={'normals': [], 'vectors': vertex_vectors}, calculate_normals=True)
+    model.save(output)
+    return
