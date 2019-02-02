@@ -74,6 +74,23 @@ def thingi10k_max_length(df):
     return max_length
 
 
+def thingi10k_df(index, pctile=None):
+    """
+    Create a pandas df of the provided index file
+    
+    Args:
+        index: str, path to thingi10k index file
+        pctile: float, limit selection to at or below this pctile of num_vertices (0 to 1)
+        
+    Returns:
+        pd.DataFrame
+    """
+    df = pd.read_csv(THINGI10K_INDEX_100)
+    if pctile:
+        df = df[df.num_vertices < df.num_vertices.quantile(pctile)]
+    return df
+
+
 def thingi10k_batch_generator(df, batch_size, flat=False, pad_length=None):
     """
     Batch Generator for the Thingi10k dataset
