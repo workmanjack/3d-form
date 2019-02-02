@@ -1,6 +1,8 @@
 from mpl_toolkits import mplot3d
 from matplotlib import pyplot
+from stl.base import BaseMesh
 from stl import mesh
+import numpy as np
 import os
 
 
@@ -42,12 +44,18 @@ def read_mesh_vectors(stl_file):
     model = mesh.Mesh.from_file(stl_file)
     return model.vectors
 
-def write_stl_normal_vectors(vertex_vectors, output='write_stl_normal_vectors.stl'):
+
+def save_vectors_as_stl(vectors, dest):
     """
+    Saves the provided vectors as an stl file ready for 3d printing
+    
     Args:
-        vertex_vectors: np.array with shape 3x3
+        vectors: np.array in shape (?, 3, 3)
+        
+    Returns: None
     """
-    # apparently numpy-stl has an update_normals function
-    model = mesh.Mesh(data={'normals': [], 'vectors': vertex_vectors}, calculate_normals=True)
-    model.save(output)
+    data = np.zeros(len(vectors), dtype=BaseMesh.dtype)
+    new_stl = mesh.Mesh(data)
+    new_stl.vectors = vectors
+    new_stl.save(dest)
     return

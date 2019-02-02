@@ -126,10 +126,14 @@ def thingi10k_batch_generator(df, batch_size, flat=False, pad_length=None):
 
             
 def process_thingi10k_index_for_normalization(data_dir, index_path):
+    """
+    TODO
+    """
     df = thingi10k_df(index_path)
     thingi10k_batch_generator(df, 10)
     for stl_file in df.stl_file:
-        
+        break
+    return
             
 
 def make_thingi10k_index(data_dir, index_path, get_json=True, get_img=True, limit=None):
