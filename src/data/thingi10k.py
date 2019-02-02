@@ -85,7 +85,7 @@ def thingi10k_df(index, pctile=None):
     Returns:
         pd.DataFrame
     """
-    df = pd.read_csv(THINGI10K_INDEX_100)
+    df = pd.read_csv(index)
     if pctile:
         df = df[df.num_vertices < df.num_vertices.quantile(pctile)]
     return df
@@ -124,6 +124,13 @@ def thingi10k_batch_generator(df, batch_size, flat=False, pad_length=None):
             yield batch
             batch = list()
 
+            
+def process_thingi10k_index_for_normalization(data_dir, index_path):
+    df = thingi10k_df(index_path)
+    thingi10k_batch_generator(df, 10)
+    for stl_file in df.stl_file:
+        
+            
 
 def make_thingi10k_index(data_dir, index_path, get_json=True, get_img=True, limit=None):
     """
