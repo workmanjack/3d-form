@@ -71,17 +71,17 @@ def download_thingi10k_image(obj_id, dest):
 
 def thingi10k_max_length(df):
     max_length = df['num_faces'].max() * 9
-    return max_length
+    return int(max_length)
 
 
 def thingi10k_df(index, pctile=None):
     """
     Create a pandas df of the provided index file
-    
+
     Args:
         index: str, path to thingi10k index file
         pctile: float, limit selection to at or below this pctile of num_vertices (0 to 1)
-        
+
     Returns:
         pd.DataFrame
     """
@@ -124,7 +124,7 @@ def thingi10k_batch_generator(df, batch_size, flat=False, pad_length=None):
             yield batch
             batch = list()
 
-            
+
 def process_thingi10k_index_for_normalization(data_dir, index_path):
     """
     TODO
@@ -134,7 +134,7 @@ def process_thingi10k_index_for_normalization(data_dir, index_path):
     for stl_file in df.stl_file:
         break
     return
-            
+
 
 def make_thingi10k_index(data_dir, index_path, get_json=True, get_img=True, limit=None):
     """
@@ -187,7 +187,8 @@ def make_thingi10k_index(data_dir, index_path, get_json=True, get_img=True, limi
 
             if get_json:
                 # get api data
-                file_data = download_thingi01k_api_data(obj_id)
+                api_data = download_thingi01k_api_data(obj_id)
+                file_data = {**file_data, **api_data}
                 json_name = '{}.json'.format(obj_id)
                 file_data['json_file'] = json_name
                 # write json
