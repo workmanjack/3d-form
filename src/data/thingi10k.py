@@ -199,21 +199,24 @@ class Thingi10k(object):
         maxs = np.asarray(self.df.x_max.max(), self.df.y_max.max(), self.df.z_max.max())
         return mins, maxs
     
-    def normalize(self, tri, mins, maxs):
+    def _normalize_vertices(self, vertices, mins, maxs):
         """
-        Normalizes the values in each row of tri according to mins, maxs
+        Normalizes the values in each row of vertices according to mins, maxs
 
         Args:
-            tri: np.array, MxN
-            mins: np.array, 1xN
-            maxs: np.array, 1xN
+            vertices: np.array, MxN
+            mins: np.array, 1xN where N_i is the minimum value in that dimension
+            maxs: np.array, 1xN where N_i is the maximum value in that dimension
         
         Returns:
             Normalized MxN array
         """
-        for i in len(tri):
-            tri[i] = (tri[i] - mins[i]) / (maxs[i] - mins[i])
-        return tri
+        vertices = [(vertices[i] - mins[i]) / (maxs[i] - mins[i]) for i in range(len(vertices))]
+        return vertices
+    
+    def _normalize_vectors(self, vectors, mins, maxs):
+        vectors = np.asarray([self._normalize_vertices(v, mins, maxs) for v in vectors])
+        return vectors
     
     def _flatten_vectors(self, vectors):
         """

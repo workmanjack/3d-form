@@ -146,6 +146,26 @@ class TestThingi10k(unittest.TestCase):
         actual = self.Thingi._reform_vectors(vectors)
         self.assertEqual(expected.shape, actual.shape)
 
+    def test__normalize_vertices(self):
+        vertices = np.asarray([[0, 1, 2], [0, 5, 10], [0, 10, 20]])
+        mins = np.asarray([0, 0, 0])
+        maxs = np.asarray([2, 10, 20])
+        expected = np.asarray([[0, .5, 1.0], [0, .5, 1.0], [0, .5, 1.0]])
+        actual = self.Thingi._normalize_vertices(vertices, mins, maxs)
+        self.assertTrue(np.array_equal(expected, actual))
+
+    def test__normalize_vectors(self):
+        vectors = np.asarray([[[0, 1, 2], [0, 5, 10], [0, 10, 20]],
+                               [[1, 0, 2], [1, 4, 6], [4, 8, 16]]])
+        mins = np.asarray([0, 0, 0])
+        maxs = np.asarray([2, 10, 20])
+        expected = np.asarray([[[0, .5, 1.0], [0, .5, 1.0], [0, .5, 1.0]],
+                               [[.5, 0, 1.0], [.1, .4, .6], [.2, .4, .8]]])
+        actual = self.Thingi._normalize_vectors(vectors, mins, maxs)
+        print(expected)
+        print(actual)
+        self.assertTrue(np.array_equal(expected, actual))
+        
         
 class TestStl(unittest.TestCase):
 
