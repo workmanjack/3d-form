@@ -68,7 +68,7 @@ class TestThingi10k(unittest.TestCase):
 
     def test_batchmaker_flat_true_pad_length_given(self):
         batches = list()
-        pad_length = 50000
+        pad_length = 90000
         for batch in self.Thingi.batchmaker(5, flat=True, pad_length=pad_length):
             batches.append(batch)
         self.assertEqual(len(batches), 2)
@@ -77,14 +77,76 @@ class TestThingi10k(unittest.TestCase):
 
     def test_batchmaker_flat_true_pad_length_truncate(self):
         batches = list()
-        pad_length = 1
+        pad_length = 9
         for batch in self.Thingi.batchmaker(5, flat=True, pad_length=pad_length):
             batches.append(batch)
         self.assertEqual(len(batches), 2)
         self.assertEqual(len(batches[0][0]), pad_length)
         self.assertEqual(len(batches[1][2]), pad_length)
 
+    def test__pad_vectors_append(self):
+        vectors = np.ones([99, 3, 3])
+        pad_length = 100*3*3
+        flat = False
+        expected = np.concatenate((vectors, np.zeros([1, 3, 3])), axis=0)
+        actual = self.Thingi._pad_vectors(vectors=vectors, pad_length=pad_length)
+        self.assertEqual(expected.shape, actual.shape)
+        self.assertEqual(actual[-1].sum(), 0)
+        self.assertEqual(actual[0].sum(), 9.0)
+        
+    def test__pad_vectors_truncate(self):
+        vectors = np.ones([101, 3, 3])
+        pad_length = 100*3*3
+        flat = False
+        expected = np.ones([100, 3, 3])
+        actual = self.Thingi._pad_vectors(vectors=vectors, pad_length=pad_length)
+        self.assertEqual(expected.shape, actual.shape)
+        self.assertEqual(actual[-1].sum(), 9.0)
+        self.assertEqual(actual[0].sum(), 9.0)
 
+    def test__pad_vectors_not_mult_9(self):
+        vectors = np.ones([1, 3, 3])
+        pad_length = 10
+        expected = vectors
+        actual = self.Thingi._pad_vectors(vectors=vectors, pad_length=pad_length)
+        self.assertEqual(expected.shape, actual.shape)
+
+    def test__flatten_vectors_n_dim(self):
+        # use specific numbers to validate that numbers are reshaped into expected spots
+        vectors = np.asarray([
+            [1, 2, 3],
+            [4, 5, 6],
+            [7, 8, 9]])
+        expected = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9])
+        actual = self.Thingi._flatten_vectors(vectors)
+        self.assertEqual(expected.shape, actual.shape)
+
+    def test__flatten_vectors_one_dim(self):
+        vectors = np.ones([5])
+        expected = np.ones([5])
+        actual = self.Thingi._flatten_vectors(vectors)
+        self.assertEqual(expected.shape, actual.shape)
+
+    def test__reform_vectors_n_dim(self):
+        vectors = np.random.rand(5, 3, 3)
+        expected = vectors
+        actual = self.Thingi._reform_vectors(vectors)
+        self.assertEqual(expected.shape, actual.shape)
+
+    def test__reform_vectors_one_dim(self):
+        vectors = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9,
+                            10, 11, 12, 13, 14, 15, 16, 17, 18])
+        expected = np.array([[
+            [1, 2, 3],
+            [4, 5, 6],
+            [7, 8, 9]],
+            [[10, 11, 12],
+             [13, 14, 15],
+             [16, 17, 18]]])
+        actual = self.Thingi._reform_vectors(vectors)
+        self.assertEqual(expected.shape, actual.shape)
+
+        
 class TestStl(unittest.TestCase):
 
     def test_read_mesh_vectors_file_dne(self):

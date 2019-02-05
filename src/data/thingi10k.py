@@ -215,24 +215,43 @@ class Thingi10k(object):
             tri[i] = (tri[i] - mins[i]) / (maxs[i] - mins[i])
         return tri
     
-    def _pad_vectors(self, pad_length, flat=True):
+    def _flatten_vectors(self, vectors):
+        """
+        Flatten vectors to single dim
+        """
+        vectors = np.reshape(vectors, [-1])
+        return vectors
+        
+    def _reform_vectors(self, vectors):
+        """
+        Reform vectors to traditional Nx3x3 shape
+        """
+        vectors = np.reshape(vectors, [-1, 3, 3])
+        return vectors
+        
+    def _pad_vectors(self, vectors, pad_length):
         """
         Pads vectors to desired length with zeros
 
+        Note: length is calculated from flattened array so must make pad_length %% 9 = 0
+
         Args:
+            vectors: np.array Nx3x3 or N
             pad_length: int, each item will be padded with zeros until specified length is reached
-                             if an item is longer than pad_length, then it will be truncated
-            flat: bool, if flat, then zeros will be appended as a one-dim list
-                        else, zeros will be added as 3x3 vertices
 
         Returns:
             padded vectors of len=pad_length
         """
+        if pad_length % 9 != 0:
+            print('error! pad_length {} is not divisible by 9! will not pad!'.format(pad_length))
+            return vectors
+        vectors = self._flatten_vectors(vectors)
         num_zeros = pad_length - len(vectors)
         if num_zeros < 0:
             vectors = vectors[:pad_length]
         else:
             vectors = np.concatenate((vectors, np.zeros(num_zeros)), axis=None)
+        vectors = self._reform_vectors(vectors)
         return vectors
 
     def batchmaker(self, batch_size, normalize=False, flat=False, pad_length=None, filenames=False):
@@ -258,14 +277,10 @@ class Thingi10k(object):
             if normalize:
                 for i, v in enumerate(vectors):
                     vectors[i] = self.normalize(v, mins, maxs)
+            if pad_length:
+                vectors = self._pad_vectors(vectors, pad_length)
             if flat:
-                vectors = np.reshape(vectors, [-1])
-                if pad_length:
-                    num_zeros = pad_length - len(vectors)
-                    if num_zeros < 0:
-                        vectors = vectors[:pad_length]
-                    else:
-                        vectors = np.concatenate((vectors, np.zeros(num_zeros)), axis=None)
+                vectors = self._flatten_vectors(vectors)
             if filenames:
                 batch.append((stl_path, vectors))
             else:
