@@ -89,14 +89,8 @@ def make_thingi10k_index(data_dir, index_path, limit=None, get_json=True, get_im
             
             # get normalization data
             vectors = read_mesh_vectors(os.path.join(mesh_dir, path))
-            mins = np.amin(vectors[0], axis=0)
-            maxs = np.amax(vectors[0], axis=0)
-            file_data['x_min'] = mins[0].item()
-            file_data['x_max'] = maxs[0].item()
-            file_data['y_min'] = mins[1].item()
-            file_data['y_max'] = maxs[1].item()
-            file_data['z_min'] = mins[2].item()
-            file_data['z_max'] = maxs[2].item()
+            file_data['xyz_min'] = np.amin(vectors).item()
+            file_data['xyz_max'] = np.amax(vectors).item()
 
             if get_img:
                 # gather object images
@@ -195,27 +189,12 @@ class Thingi10k(object):
         return int(max_length)
     
     def _prep_normalization(self):
-        mins = np.asarray(self.df.x_min.min(), self.df.y_min.min(), self.df.z_min.min())
-        maxs = np.asarray(self.df.x_max.max(), self.df.y_max.max(), self.df.z_max.max())
-        return mins, maxs
-    
-    def _normalize_vertices(self, vertices, mins, maxs):
-        """
-        Normalizes the values in each row of vertices according to mins, maxs
-
-        Args:
-            vertices: np.array, MxN
-            mins: np.array, 1xN where N_i is the minimum value in that dimension
-            maxs: np.array, 1xN where N_i is the maximum value in that dimension
-        
-        Returns:
-            Normalized MxN array
-        """
-        vertices = [(vertices[i] - mins[i]) / (maxs[i] - mins[i]) for i in range(len(vertices))]
-        return vertices
-    
-    def _normalize_vectors(self, vectors, mins, maxs):
-        vectors = np.asarray([self._normalize_vertices(v, mins, maxs) for v in vectors])
+        xyz_min = self.df.xyz_min.min()
+        xyz_max = self.df.xyz_max.max()
+        return xyz_min, xyz_max
+       
+    def _normalize_vectors(self, vectors, xyz_min, xyz_max):
+        vectors = (vectors - xyz_min) / (xyz_max - xyz_min) 
         return vectors
     
     def _flatten_vectors(self, vectors):
@@ -273,21 +252,22 @@ class Thingi10k(object):
             ndarray of length batch_size and format (<stl_file>, <vectors>) if filenames else <vectors>
         """
         batch = list()
-        mins, maxs = self._prep_normalization()
+        xyz_min, xyz_max = self._prep_normalization()
         for i, stl_file in enumerate(self.df['stl_file']):
+            # read in stl file, read in vectors, apply ops as instructed
             stl_path = os.path.join(THINGI10K_STL_DIR, stl_file)
             vectors = read_mesh_vectors(stl_path)
-            if normalize:
-                for i, v in enumerate(vectors):
-                    vectors[i] = self.normalize(v, mins, maxs)
             if pad_length:
                 vectors = self._pad_vectors(vectors, pad_length)
             if flat:
                 vectors = self._flatten_vectors(vectors)
+            if normalize:
+                vectors = self._normalize_vectors(vectors, xyz_min, xyz_max)
             if filenames:
                 batch.append((stl_path, vectors))
             else:
                 batch.append(vectors)
+            # yield batch if ready; else continue
             if (i+1) % batch_size == 0 or (i+1) == len(self.df):
                 yield np.asarray(batch)
                 batch = list()

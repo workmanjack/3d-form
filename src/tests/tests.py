@@ -56,6 +56,7 @@ class TestThingi10k(unittest.TestCase):
         for batch in self.Thingi.batchmaker(5, flat=True):
             batches.append(batch)
         self.assertEqual(len(batches), 2)
+        # len value taken from manual inspection of csv num_faces
         self.assertEqual(len(batches[0][0]), 10746*3*3)
         # spot check that first and last vertices are not zero
         # to ensure padding has not been applied
@@ -84,6 +85,25 @@ class TestThingi10k(unittest.TestCase):
         self.assertEqual(len(batches[0][0]), pad_length)
         self.assertEqual(len(batches[1][2]), pad_length)
 
+    def test_batchmaker_normalize_true(self):
+        batches = list()
+        pad_length = 9
+        for batch in self.Thingi.batchmaker(5, normalize=True, filenames=True):
+            batches.append(batch)
+        self.assertEqual(len(batches), 2)
+        for batch in batches:
+            for stl_file, vectors in batch:
+                self.assertTrue(vectors.max() <= 1)
+                self.assertTrue(vectors.min() >= 0)
+
+    def test__prep_normalization(self):
+        # values taken from manual inspection of csv num_faces
+        actual_mins, actual_maxs = self.Thingi._prep_normalization()
+        expected_mins = [-83.2, -63.5, -213.192]
+        expected_maxs = [51.16601, 63.5, 121]
+        self.assertTrue(expected_mins, actual_mins)
+        self.assertTrue(expected_maxs, actual_maxs)
+        
     def test__pad_vectors_append(self):
         vectors = np.ones([99, 3, 3])
         pad_length = 100*3*3
@@ -146,24 +166,14 @@ class TestThingi10k(unittest.TestCase):
         actual = self.Thingi._reform_vectors(vectors)
         self.assertEqual(expected.shape, actual.shape)
 
-    def test__normalize_vertices(self):
-        vertices = np.asarray([[0, 1, 2], [0, 5, 10], [0, 10, 20]])
-        mins = np.asarray([0, 0, 0])
-        maxs = np.asarray([2, 10, 20])
-        expected = np.asarray([[0, .5, 1.0], [0, .5, 1.0], [0, .5, 1.0]])
-        actual = self.Thingi._normalize_vertices(vertices, mins, maxs)
-        self.assertTrue(np.array_equal(expected, actual))
-
     def test__normalize_vectors(self):
         vectors = np.asarray([[[0, 1, 2], [0, 5, 10], [0, 10, 20]],
                                [[1, 0, 2], [1, 4, 6], [4, 8, 16]]])
-        mins = np.asarray([0, 0, 0])
-        maxs = np.asarray([2, 10, 20])
-        expected = np.asarray([[[0, .5, 1.0], [0, .5, 1.0], [0, .5, 1.0]],
-                               [[.5, 0, 1.0], [.1, .4, .6], [.2, .4, .8]]])
-        actual = self.Thingi._normalize_vectors(vectors, mins, maxs)
-        print(expected)
-        print(actual)
+        xyz_min = 0
+        xyz_max = 20
+        expected = np.asarray([[[0, .05, .1], [0, .25, .5], [0, .5, 1.0]],
+                               [[.05, 0, .1], [.05, .2, .3], [.2, .4, .8]]])
+        actual = self.Thingi._normalize_vectors(vectors, xyz_min, xyz_max)
         self.assertTrue(np.array_equal(expected, actual))
         
         
