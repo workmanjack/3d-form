@@ -25,9 +25,9 @@ def main():
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000, get_img=False)
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX, get_json=False, get_img=False)
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_10, limit=10)
-    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, limit=100)
+    #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, limit=100)
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000)
-    #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
 
 
 if __name__ == '__main__':
