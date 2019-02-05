@@ -145,10 +145,11 @@ def make_thingi10k_index(data_dir, index_path, limit=None, get_json=True, get_im
 
 class Thingi10k(object):
     
-    def __init__(self, df, index, pctile):
+    def __init__(self, df, index, pctile, stl_dir=THINGI10K_STL_DIR):
         self.index = index
         self.df = df
         self.pctile = pctile
+        self.stl_dir = stl_dir
         return 
     
     @classmethod
@@ -253,9 +254,9 @@ class Thingi10k(object):
         """
         batch = list()
         xyz_min, xyz_max = self._prep_normalization()
-        for i, stl_file in enumerate(self.df['stl_file']):
+        for i, stl_file in enumerate(self.df.stl_file):
             # read in stl file, read in vectors, apply ops as instructed
-            stl_path = os.path.join(THINGI10K_STL_DIR, stl_file)
+            stl_path = os.path.join(self.stl_dir, stl_file)
             vectors = read_mesh_vectors(stl_path)
             if pad_length:
                 vectors = self._pad_vectors(vectors, pad_length)
