@@ -1,8 +1,8 @@
 # project imports
 import env
 from data import DATA_DIR, THINGI10K_INDEX, PROCESSED_DIR
-from data.stl import read_mesh_vectors, write_stl_normal_vectors
-from data.thingi10k import thingi10k_batch_generator
+from data.stl import read_mesh_vectors
+from data.thingi10k import Thingi10k
 
 
 # python packages
@@ -29,20 +29,21 @@ class TestMakeDataset(unittest.TestCase):
 
 
 class TestThingi10k(unittest.TestCase):
+    
+    def setUp(self):
+        self.Thingi = Thingi10k.initFromIndex(TEST_INDEX)    
 
-    def test_thingi10k_batch_generator_even_batches(self):
+    def test_batchmaker_even_batches(self):
         batches = list()
-        df = pd.read_csv(TEST_INDEX)
-        for batch in thingi10k_batch_generator(df, 5):
+        for batch in self.Thingi.batchmaker(5):
             batches.append(batch)
         self.assertEqual(len(batches), 2)
         self.assertEqual(len(batches[0]), 5)
         self.assertEqual(len(batches[1]), 5)
 
-    def test_thingi10k_batch_generator_uneven_batches(self):
+    def test_batchmaker_uneven_batches(self):
         batches = list()
-        df = pd.read_csv(TEST_INDEX)
-        for batch in thingi10k_batch_generator(df, 3):
+        for batch in self.Thingi.batchmaker(3):
             batches.append(batch)
         self.assertEqual(len(batches), 4)
         self.assertEqual(len(batches[0]), 3)
@@ -50,34 +51,38 @@ class TestThingi10k(unittest.TestCase):
         self.assertEqual(len(batches[2]), 3)
         self.assertEqual(len(batches[3]), 1)
 
-    def test_thingi10k_batch_generator_flat_true_pad_length_none(self):
+    def test_batchmaker_flat_true_pad_length_none(self):
         batches = list()
-        df = pd.read_csv(TEST_INDEX)
-        for batch in thingi10k_batch_generator(df, 5, flat=True):
+        for batch in self.Thingi.batchmaker(5, flat=True):
             batches.append(batch)
         self.assertEqual(len(batches), 2)
-        self.assertEqual(len(batches[0][0]), 270*3*3)
+        self.assertEqual(len(batches[0][0]), 10746*3*3)
+        # spot check that first and last vertices are not zero
+        # to ensure padding has not been applied
+        self.assertTrue(batches[0][0][0] != 0)
+        self.assertTrue(batches[0][0][1] != 0)
+        self.assertTrue(batches[0][0][2] != 0)
+        self.assertTrue(batches[0][0][-1] != 0)
+        self.assertTrue(batches[0][0][-2] != 0)
+        self.assertTrue(batches[0][0][-3] != 0)
 
-    def test_thingi10k_batch_generator_flat_true_pad_length_given(self):
+    def test_batchmaker_flat_true_pad_length_given(self):
         batches = list()
         pad_length = 50000
-        df = pd.read_csv(TEST_INDEX)
-        for batch in thingi10k_batch_generator(df, 5, flat=True, pad_length=pad_length):
+        for batch in self.Thingi.batchmaker(5, flat=True, pad_length=pad_length):
             batches.append(batch)
         self.assertEqual(len(batches), 2)
         self.assertEqual(len(batches[0][0]), pad_length)
         self.assertEqual(len(batches[1][2]), pad_length)
 
-    def test_thingi10k_batch_generator_flat_true_pad_length_truncate(self):
+    def test_batchmaker_flat_true_pad_length_truncate(self):
         batches = list()
         pad_length = 1
-        df = pd.read_csv(TEST_INDEX)
-        for batch in thingi10k_batch_generator(df, 5, flat=True, pad_length=pad_length):
+        for batch in self.Thingi.batchmaker(5, flat=True, pad_length=pad_length):
             batches.append(batch)
         self.assertEqual(len(batches), 2)
         self.assertEqual(len(batches[0][0]), pad_length)
         self.assertEqual(len(batches[1][2]), pad_length)
-
 
 
 class TestStl(unittest.TestCase):
@@ -100,7 +105,4 @@ class TestStl(unittest.TestCase):
         ])
         actual = read_mesh_vectors(TEST_STL)
         self.assertEqual(expected.all(), actual.all())
-
-    def test_compute_normal_vectors(self):
-        vectors = read_mesh_vectors(TEST_STL)
-        write_stl_normal_vectors(vectors)
+        

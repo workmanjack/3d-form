@@ -20,9 +20,13 @@ def main():
     """
     # logger = logging.getLogger(__name__)
     # logger.info('making final data set from raw data')
-    # make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_10, 10)
-    # make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, 100)
-    #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000, get_img=False)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_10, limit=10, get_json=True, get_img=True)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, limit=100, get_img=False)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000, get_img=False)
+    #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX, get_json=False, get_img=False)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_10, limit=10)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, limit=100)
+    make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000)
     make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
 
 

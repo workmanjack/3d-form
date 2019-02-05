@@ -11,7 +11,7 @@ import stl
 stl.stl.MAX_COUNT = 2000000000
 
 
-def plot_mesh(mesh_vectors):
+def plot_mesh(mesh_vectors, title=None):
     """
     TODO: save to file instead of .show()?
     """
@@ -24,9 +24,12 @@ def plot_mesh(mesh_vectors):
     axes.add_collection3d(mplot3d.art3d.Poly3DCollection(mesh_vectors))
 
     # Auto scale to the mesh size
-    scale = your_mesh.points.flatten(-1)
+    scale = mesh_vectors.reshape([-1, 9]).flatten(-1)
     axes.auto_scale_xyz(scale, scale, scale)
 
+    if title is not None:
+        pyplot.title(title, pad=20)
+    
     # Show the plot to the screen
     pyplot.show()
 
