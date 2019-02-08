@@ -197,6 +197,15 @@ class Thingi10k(object):
     def _normalize_vectors(self, vectors, xyz_min, xyz_max):
         vectors = (vectors - xyz_min) / (xyz_max - xyz_min) 
         return vectors
+
+    def _triangulize_vectors(self, vectors):
+        """
+        Reshape vectors to Nx9 shape
+        
+        Elements should be [x1, y1, z1, x2, y2, z2, x3, y3, z3]
+        """
+        vectors = np.reshape(vectors, [-1, 9])
+        return vectors
     
     def _flatten_vectors(self, vectors):
         """
@@ -237,7 +246,7 @@ class Thingi10k(object):
         vectors = self._reform_vectors(vectors)
         return vectors
 
-    def batchmaker(self, batch_size, normalize=False, flat=False, pad_length=None, filenames=False):
+    def batchmaker(self, batch_size, normalize=False, triangles=False, flat=False, pad_length=None, filenames=False):
         """
         Batch Generator for the Thingi10k dataset
 
@@ -262,6 +271,8 @@ class Thingi10k(object):
                 vectors = self._pad_vectors(vectors, pad_length)
             if flat:
                 vectors = self._flatten_vectors(vectors)
+            if triangles:
+                vectors = self._triangulize_vectors(vectors)
             if normalize:
                 vectors = self._normalize_vectors(vectors, xyz_min, xyz_max)
             if filenames:
@@ -274,6 +285,54 @@ class Thingi10k(object):
                 batch = list()
         return
     
+    
+    def triangle_batchmaker(self, normalize=True):
+        """
+        Batch Generator by Triangle for the Thingi10k dataset
+
+        Args:
+            normalize: bool, normalize vertex coordinate values or not
+
+        Returns:
+            nd.array of shape (1, 3) where elements are [x, y, z]
+        """
+        batch = list()
+        xyz_min, xyz_max = self._prep_normalization()
+        for i, stl_file in enumerate(self.df.stl_file):
+            # read in stl file, read in vectors, apply ops as instructed
+            stl_path = os.path.join(self.stl_dir, stl_file)
+            vectors = read_mesh_vectors(stl_path)
+            if normalize:
+                vectors = self._normalize_vectors(vectors, xyz_min, xyz_max)
+            triangles = self._triangulize_vectors(vectors)
+
+            for tri in triangles:
+                yield tuple(tri)
+        return
+    
+    def vertex_batchmaker(self, normalize=True):
+        """
+        Batch Generator by Vertex for the Thingi10k dataset
+
+        Args:
+            normalize: bool, normalize vertex coordinate values or not
+
+        Returns:
+            nd.array of shape (1, 3) where elements are [x, y, z]
+        """
+        batch = list()
+        xyz_min, xyz_max = self._prep_normalization()
+        for i, stl_file in enumerate(self.df.stl_file):
+            # read in stl file, read in vectors, apply ops as instructed
+            stl_path = os.path.join(self.stl_dir, stl_file)
+            vectors = read_mesh_vectors(stl_path)
+            if normalize:
+                vectors = self._normalize_vectors(vectors, xyz_min, xyz_max)
+            vertices = self._flatten_vectors(vectors)
+            for vtx in vertices:
+                yield vtx
+        return
+
     def vectors(self, n=None, stl_id=None):
         """
         Retrieves the vectors of the specified stl file

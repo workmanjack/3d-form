@@ -96,6 +96,18 @@ class TestThingi10k(unittest.TestCase):
                 self.assertTrue(vectors.max() <= 1)
                 self.assertTrue(vectors.min() >= 0)
 
+    def test_batchmaker_normalize_true_triangles_true(self):
+        batches = list()
+        pad_length = 9
+        for batch in self.Thingi.batchmaker(5, normalize=True, triangles=True):
+            batches.append(batch)
+        self.assertEqual(len(batches), 2)
+        for batch in batches:
+            for vectors in batch:
+                self.assertTrue(vectors.max() <= 1)
+                self.assertTrue(vectors.min() >= 0)
+                self.assertTrue(vectors.shape == (len(vectors), 9))
+                
     def test__prep_normalization(self):
         # values taken from manual inspection of csv num_faces
         actual_mins, actual_maxs = self.Thingi._prep_normalization()
@@ -147,6 +159,26 @@ class TestThingi10k(unittest.TestCase):
         actual = self.Thingi._flatten_vectors(vectors)
         self.assertEqual(expected.shape, actual.shape)
 
+    def test__triangulize_vectors_n_dim(self):
+        vectors = np.asarray([
+            [
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9],
+            ], [
+                [10, 11, 12],
+                [13, 14, 15],
+                [16, 17, 18]
+            ]
+        ])
+        expected = np.asarray([
+                [1, 2, 3, 4, 5, 6, 7, 8, 9],
+                [10, 11, 12, 13, 14, 15, 16, 17, 18]
+        ])
+        actual = self.Thingi._triangulize_vectors(vectors)
+        self.assertEqual(expected.shape, actual.shape)
+        self.assertTrue(np.array_equal(expected, actual))
+        
     def test__reform_vectors_n_dim(self):
         vectors = np.random.rand(5, 3, 3)
         expected = vectors

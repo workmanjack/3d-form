@@ -52,10 +52,13 @@ pandas==0.24.0
 pandocfilters==1.4.2
 parso==0.3.2
 pathlib2==2.3.3
+pexpect==4.6.0
 pickleshare==0.7.5
+pkg-resources==0.0.0
 prometheus-client==0.5.0
 prompt-toolkit==2.0.8
 protobuf==3.6.1
+ptyprocess==0.6.0
 pyasn1==0.4.5
 pycodestyle==2.4.0
 pyflakes==2.0.0
@@ -72,6 +75,8 @@ qtconsole==4.4.3
 requests==2.21.0
 rsa==3.4.2
 s3transfer==0.1.13
+scipy==1.2.0
+seaborn==0.9.0
 Send2Trash==1.5.0
 six==1.12.0
 snowballstemmer==1.2.1
