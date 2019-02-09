@@ -1,7 +1,8 @@
 import os
+from utils import PROJECT_ROOT
 
 
-DATA_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)), '../../data')
+DATA_DIR = os.path.join(os.path.join(PROJECT_ROOT, 'data'))
 PROCESSED_DIR = os.path.join(DATA_DIR, 'processed')
 EXTERNAL_DIR = os.path.join(DATA_DIR, 'external')
 THINGI10K_STL_DIR = os.path.join(EXTERNAL_DIR, 'Thingi10k/raw_meshes')

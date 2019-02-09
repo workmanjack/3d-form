@@ -1,6 +1,10 @@
 import requests
+import os
 
 
+PROJECT_ROOT = os.path.join(os.path.realpath(os.path.dirname(__file__)), '..')
+
+             
 def api_json(url):
     """
     Returns json data from the provided url

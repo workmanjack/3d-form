@@ -3,6 +3,8 @@ import env
 from data import DATA_DIR, THINGI10K_INDEX, PROCESSED_DIR
 from data.stl import read_mesh_vectors
 from data.thingi10k import Thingi10k
+from utils import PROJECT_ROOT
+from models import MODEL_DIR
 
 
 # python packages
@@ -19,15 +21,21 @@ TEST_STL = os.path.join(CONTENT_DIR, '{}_test.stl'.format(100027))
 TEST_INDEX = os.path.join(CONTENT_DIR, 'thingi10k_index_10.csv')
 
 
-class TestMakeDataset(unittest.TestCase):
+class TestPaths(unittest.TestCase):
 
     def test_DATA_DIR(self):
-        os.path.exists(DATA_DIR)
+        self.assertTrue(os.path.exists(DATA_DIR))
 
     def test_THINGI10K_INDEX(self):
-        os.path.exists(os.path.dirname(THINGI10K_INDEX))
+        self.assertTrue(os.path.exists(os.path.dirname(THINGI10K_INDEX)))
 
+    def test_PROJECT_ROOT(self):
+        self.assertTrue(os.path.exists(PROJECT_ROOT))
 
+    def test_MODEL_DIR(self):
+        self.assertTrue(os.path.exists(MODEL_DIR))
+
+        
 class TestThingi10k(unittest.TestCase):
     
     def setUp(self):
