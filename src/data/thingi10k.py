@@ -280,23 +280,24 @@ class Thingi10k(object):
             else:
                 batch.append(vectors)
             # yield batch if ready; else continue
-            if (i+1) % batch_size == 0 or (i+1) == len(self.df):
+            if (i+1) % batch_size == 0:
                 yield np.asarray(batch)
                 batch = list()
         return
     
-    
-    def triangle_batchmaker(self, normalize=True):
+    def triangle_sequencer(self, seq_length=1, normalize=True, pad_sequences=True):
         """
-        Batch Generator by Triangle for the Thingi10k dataset
+        Sequence Generator by Triangle for the Thingi10k dataset
 
         Args:
+            seq_length: int, number of triangles to return at one time
             normalize: bool, normalize vertex coordinate values or not
+            pad_sequences: bool, add zeros to complete a sequence if num triangles remaining
+                                 is not enough to complete a sequence
 
         Returns:
             nd.array of shape (1, 3) where elements are [x, y, z]
         """
-        batch = list()
         xyz_min, xyz_max = self._prep_normalization()
         for i, stl_file in enumerate(self.df.stl_file):
             # read in stl file, read in vectors, apply ops as instructed
@@ -306,8 +307,43 @@ class Thingi10k(object):
                 vectors = self._normalize_vectors(vectors, xyz_min, xyz_max)
             triangles = self._triangulize_vectors(vectors)
 
+            seq_count = 0
+            to_yield = list()
             for tri in triangles:
-                yield tuple(tri)
+                if (seq_length - seq_count) == 0:
+                    yield np.asarray(to_yield)
+                    seq_count = 0
+                    to_yield = list()
+                else:
+                    to_yield.append(tri)
+                    seq_count += 1
+            if pad_sequences:
+                while (seq_length - seq_count) > 0:
+                    to_yield.append([0]*9)
+                    seq_count += 1
+                yield np.asarray(to_yield)
+        return
+
+    def triangle_batchmaker(self, batch_size, seq_length, pad_batches=True):
+        """
+        """
+        batch = list()
+        batch_count = 0
+        for seq in self.triangle_sequencer(seq_length):
+            if (batch_size - batch_count) == 0:
+                yield np.asarray(batch)
+                batch_count = 0
+                batch = list()
+            else:
+                batch.append(seq)
+                batch_count += 1
+        if pad_batches:
+            while (batch_size - batch_count) > 0:
+                batch.append([[0]*9]*seq_length)
+                batch_count += 1
+            yield np.asarray(batch)
+        if batch_count > 0 and batch_count != batch_size:
+            print('leftovers: batch_count * seq_length = {} triangles left behind'.format(batch_count, seq_length))
         return
     
     def vertex_batchmaker(self, normalize=True):

@@ -8,3 +8,7 @@ __pycache__
 *.sublime-workspace
 *.ipynb_checkpoints
 notebooks/cynthia/*
+# ignore until ready to share
+models/stl_rnn
+models/stl_vae
+
