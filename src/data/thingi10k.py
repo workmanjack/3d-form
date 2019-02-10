@@ -189,6 +189,9 @@ class Thingi10k(object):
         max_length = self.df['num_faces'].max() * 9
         return int(max_length)
     
+    def num_triangles(self):
+        return self.df.num_faces.sum()
+    
     def _prep_normalization(self):
         xyz_min = self.df.xyz_min.min()
         xyz_max = self.df.xyz_max.max()
