@@ -1,8 +1,11 @@
+from data.binvox_rw import read_as_3d_array
 from mpl_toolkits import mplot3d
 from matplotlib import pyplot
 from stl.base import BaseMesh
+from data import VOXELS_DIR
 from stl import mesh
 import numpy as np
+import subprocess
 import os
 
 
@@ -62,3 +65,30 @@ def save_vectors_as_stl(vectors, dest):
     new_stl.vectors = vectors
     new_stl.save(dest)
     return
+
+
+def voxelize_stl(self, stl_path, dest_dir=VOXELS_DIR, check_if_exists=True):
+    """
+    Converts an STL file into a voxel representation with binvox
+    
+    Args:
+        stl_path: str, path to stl file to voxelize
+        dest_dir: str, dir to write .binvox file to (default VOXELS_DIR)
+        check_if_exists: bool, if True, will check and see if a .binvox file already exists
+                               and return that rather than regenerate (default True)
+                               
+    Returns:
+        str, path to binvox file
+    """
+    binvox_output = stl_path.replace('.stl', '.binvox')
+    binvox_dest = os.path.join(dest_dir, os.path.basename(binvox_output))
+    if not os.path.exists(binvox_dest):
+        subprocess.run(["../src/data/binvox", stl_path])
+        os.rename(binvox_output, binvox_dest)
+    return binvox_dest
+
+
+def read_voxel_array(vox_file):
+    with open(vox_file, 'rb') as f:
+        vox = binvox_rw.read_as_3d_array(f)
+    return vox
