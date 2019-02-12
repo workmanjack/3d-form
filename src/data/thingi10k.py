@@ -401,6 +401,11 @@ class Thingi10k(object):
                 yield vtx
         return
 
+    def get_stl_title(self, stl_id):
+        """
+        """
+        return self.df.loc[self.df.stl_file == '{}.stl'.format(stl_id), 'title'].iloc[0]
+    
     def vectors(self, n=None, stl_id=None):
         """
         Retrieves the vectors of the specified stl file
