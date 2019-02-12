@@ -4,7 +4,7 @@ from utils import PROJECT_ROOT
 
 DATA_DIR = os.path.join(os.path.join(PROJECT_ROOT, 'data'))
 PROCESSED_DIR = os.path.join(DATA_DIR, 'processed')
-VOXELS_DIR = os.path.join(PROCESSED_DIR, 'voxels')
+VOXELS_DIR = os.path.join(PROCESSED_DIR, 'Thingi10k/voxels')
 EXTERNAL_DIR = os.path.join(DATA_DIR, 'external')
 THINGI10K_STL_DIR = os.path.join(EXTERNAL_DIR, 'Thingi10k/raw_meshes')
 THINGI10K_INDEX = os.path.join(PROCESSED_DIR, 'thingi10k_index.csv')

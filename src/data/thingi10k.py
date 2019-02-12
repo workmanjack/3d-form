@@ -1,5 +1,5 @@
 # project imports
-from data.stl import read_mesh_vectors, voxelize_stl
+from data.stl import read_mesh_vectors, voxelize_stl, read_voxel_array
 from data import RAW_DIR, THINGI10K_STL_DIR, THINGI10K_INDEX, THINGI10K_INDEX_10, THINGI10K_INDEX_100, THINGI10K_INDEX_1000
 from utils import api_json, dataframe_pctile_slice
 
@@ -293,26 +293,15 @@ class Thingi10k(object):
         for i, stl_file in enumerate(self.df.stl_file):
             # read in stl file, read in vectors, apply ops as instructed
             stl_path = os.path.join(self.stl_dir, stl_file)
-            vectors = read_mesh_vectors(stl_path)
-            if pad_length:
-                vectors = self._pad_vectors(vectors, pad_length)
-            if flat:
-                vectors = self._flatten_vectors(vectors)
-            if triangles:
-                vectors = self._triangulize_vectors(vectors)
-            if normalize:
-                vectors = self._normalize_vectors(vectors, xyz_min, xyz_max)
-            if filenames:
-                batch.append((stl_path, vectors))
-            else:
-                batch.append(vectors)
+            vox_path = voxelize_stl(stl_path)
+            vox = read_voxel_array(vox_path)
+            batch.append(vox)
             # yield batch if ready; else continue
             if (i+1) % batch_size == 0:
                 yield np.asarray(batch)
                 batch = list()
         return
         
-    
     def triangle_sequencer(self, seq_length=1, normalize=True, pad_sequences=True):
         """
         Sequence Generator by Triangle for the Thingi10k dataset

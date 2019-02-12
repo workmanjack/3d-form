@@ -67,7 +67,7 @@ def save_vectors_as_stl(vectors, dest):
     return
 
 
-def voxelize_stl(self, stl_path, dest_dir=VOXELS_DIR, check_if_exists=True):
+def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True):
     """
     Converts an STL file into a voxel representation with binvox
     
@@ -82,7 +82,7 @@ def voxelize_stl(self, stl_path, dest_dir=VOXELS_DIR, check_if_exists=True):
     """
     binvox_output = stl_path.replace('.stl', '.binvox')
     binvox_dest = os.path.join(dest_dir, os.path.basename(binvox_output))
-    if not os.path.exists(binvox_dest):
+    if not check_if_exists or not os.path.exists(binvox_dest):
         subprocess.run(["../src/data/binvox", stl_path])
         os.rename(binvox_output, binvox_dest)
     return binvox_dest
@@ -90,5 +90,5 @@ def voxelize_stl(self, stl_path, dest_dir=VOXELS_DIR, check_if_exists=True):
 
 def read_voxel_array(vox_file):
     with open(vox_file, 'rb') as f:
-        vox = binvox_rw.read_as_3d_array(f)
+        vox = read_as_3d_array(f)
     return vox
