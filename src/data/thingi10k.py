@@ -295,7 +295,8 @@ class Thingi10k(object):
             stl_path = os.path.join(self.stl_dir, stl_file)
             vox_path = voxelize_stl(stl_path)
             vox = read_voxel_array(vox_path)
-            batch.append(vox)
+            batch.append(np.reshape(vox.data, [256, 256, 256, 1]))  # making assumptions about required shape...
+            #batch.append(vox.data)
             # yield batch if ready; else continue
             if (i+1) % batch_size == 0:
                 yield np.asarray(batch)
