@@ -185,6 +185,20 @@ class Thingi10k(object):
     def init10k(cls, pctile=None):
         return cls.initFromIndex(THINGI10K_INDEX, pctile)
 
+    def filter_by_tag(self, tag):
+        """
+        Filter dataframe rows down to those that contain "tag"
+        
+        Because the tags in the index look like ['tag1', 'tag2'] we wrap the provided
+        tag in quotes to ensure an exact match.
+        """
+        # drop na first because we know those don't contain tag
+        # and because they will break str.contains
+        self.df = self.df.dropna(subset=['tags'])
+        # filter
+        self.df = self.df[self.df.tags.str.contains("'{}'".format(tag))]
+        return
+    
     def max_length(self):
         max_length = self.df['num_faces'].max() * 9
         return int(max_length)
