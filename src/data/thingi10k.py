@@ -1,5 +1,6 @@
 # project imports
-from data.stl import read_mesh_vectors, voxelize_stl, read_voxel_array
+from data.stl import read_mesh_vectors, voxelize_stl
+from data.voxels import read_voxel_array
 from data import RAW_DIR, THINGI10K_STL_DIR, THINGI10K_INDEX, THINGI10K_INDEX_10, THINGI10K_INDEX_100, THINGI10K_INDEX_1000
 from utils import api_json, dataframe_pctile_slice
 
