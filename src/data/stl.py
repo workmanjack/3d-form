@@ -1,9 +1,13 @@
-from data.binvox_rw import read_as_3d_array
-from mpl_toolkits import mplot3d
-from matplotlib import pyplot
+# project imports
 from stl.base import BaseMesh
 from data import VOXELS_DIR
 from stl import mesh
+
+
+# python & package imports
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from mpl_toolkits import mplot3d
+from matplotlib import pyplot
 import numpy as np
 import subprocess
 import os
@@ -12,6 +16,10 @@ import os
 # override max count of triangles
 import stl
 stl.stl.MAX_COUNT = 2000000000
+
+
+# default dim size of binvox voxel objects
+VOXEL_SIZE = 64
 
 
 def plot_mesh(mesh_vectors, title=None):
@@ -24,7 +32,7 @@ def plot_mesh(mesh_vectors, title=None):
     axes = mplot3d.Axes3D(figure)
 
     # add the vectors to the plot
-    axes.add_collection3d(mplot3d.art3d.Poly3DCollection(mesh_vectors))
+    axes.add_collection3d(Poly3DCollection(mesh_vectors))
 
     # Auto scale to the mesh size
     scale = mesh_vectors.reshape([-1, 9]).flatten(-1)
@@ -67,7 +75,7 @@ def save_vectors_as_stl(vectors, dest):
     return
 
 
-def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True):
+def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL_SIZE):
     """
     Converts an STL file into a voxel representation with binvox
     
@@ -76,19 +84,24 @@ def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True):
         dest_dir: str, dir to write .binvox file to (default VOXELS_DIR)
         check_if_exists: bool, if True, will check and see if a .binvox file already exists
                                and return that rather than regenerate (default True)
-                               
+        size: int, specify bounding box size of produced voxel object where arg N makes NxNxN
+                   (default=VOXEL_SIZE)
+
     Returns:
         str, path to binvox file
     """
     binvox_output = stl_path.replace('.stl', '.binvox')
     binvox_dest = os.path.join(dest_dir, os.path.basename(binvox_output))
-    if not check_if_exists or not os.path.exists(binvox_dest):
-        subprocess.run(["../src/data/binvox", stl_path])
-        os.rename(binvox_output, binvox_dest)
+    exists = os.path.exists(binvox_dest)
+    if check_if_exists and exists:
+        print('Not Voxelizing: Binvox for {} already exists at {}'.format(stl_path, binvox_dest))
+        return None
+    elif exists:
+        # overwrite binvox
+        os.remove(binvox_dest)
+    subprocess.run(['../src/data/binvox', '-cb', '-d', str(size), stl_path])
+    # binvox will output the binvox file in the same dir as stl_path
+    # here we move it to the desired dest
+    os.rename(binvox_output, binvox_dest)
     return binvox_dest
 
-
-def read_voxel_array(vox_file):
-    with open(vox_file, 'rb') as f:
-        vox = read_as_3d_array(f)
-    return vox
