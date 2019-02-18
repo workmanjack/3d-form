@@ -1,5 +1,6 @@
 .3d-form
 data/external/*
+!data/external/Bear.stl
 data/raw/*
 data/processed/Thingi10k/voxels/*
 notebooks/_output/*
