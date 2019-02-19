@@ -1,7 +1,7 @@
 # project imports
 from data.stl import read_mesh_vectors, voxelize_stl
 from data.voxels import read_voxel_array
-from data import RAW_DIR, THINGI10K_STL_DIR, THINGI10K_INDEX, THINGI10K_INDEX_10, THINGI10K_INDEX_100, THINGI10K_INDEX_1000
+from data import RAW_DIR, VOXELS_DIR, THINGI10K_STL_DIR, THINGI10K_INDEX, THINGI10K_INDEX_10, THINGI10K_INDEX_100, THINGI10K_INDEX_1000
 from utils import api_json, dataframe_pctile_slice
 
 
@@ -303,15 +303,16 @@ class Thingi10k(object):
                 batch = list()
         return
     
-    def voxels_batchmaker(self, batch_size):
+    def voxels_batchmaker(self, batch_size, voxels_dim):
         batch = list()
         for i, stl_file in enumerate(self.df.stl_file):
             # read in stl file, read in vectors, apply ops as instructed
             stl_path = os.path.join(self.stl_dir, stl_file)
-            vox_path = voxelize_stl(stl_path)
+            vox_path = voxelize_stl(stl_path, dest_dir=os.path.join(VOXELS_DIR, voxels_dim), size=voxels_dim)
             vox = read_voxel_array(vox_path)
-            batch.append(np.reshape(vox.data, [256, 256, 256, 1]))  # making assumptions about required shape...
             #batch.append(vox.data)
+            # each element has 1 "channel" aka data point (if RGB color, it would be 3)
+            batch.append(np.reshape(vox.data, [voxels_dim, voxels_dim, voxels_dim, 1])) 
             # yield batch if ready; else continue
             if (i+1) % batch_size == 0:
                 yield np.asarray(batch)
