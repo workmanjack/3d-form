@@ -95,10 +95,15 @@ def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL
     exists = os.path.exists(binvox_dest)
     if check_if_exists and exists:
         print('Not Voxelizing: Binvox for {} already exists at {}'.format(stl_path, binvox_dest))
-        return None
+        return binvox_dest
     elif exists:
         # overwrite binvox
         os.remove(binvox_dest)
+    # check if parent directory exists
+    binvox_dir = os.path.dirname(binvox_dest)
+    if not os.path.exists(binvox_dir):
+        os.makedirs(binvox_dir, exist_ok=True)
+    # convert
     subprocess.run(['../src/data/binvox', '-cb', '-d', str(size), stl_path])
     # binvox will output the binvox file in the same dir as stl_path
     # here we move it to the desired dest
