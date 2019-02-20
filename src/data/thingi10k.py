@@ -186,6 +186,10 @@ class Thingi10k(object):
     def init10k(cls, pctile=None):
         return cls.initFromIndex(THINGI10K_INDEX, pctile)
 
+    def filter_to_just_one(self):
+        self.df = self.df[:1]
+        return
+    
     def filter_by_tag(self, tag):
         """
         Filter dataframe rows down to those that contain "tag"
