@@ -75,7 +75,7 @@ def save_vectors_as_stl(vectors, dest):
     return
 
 
-def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL_SIZE):
+def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL_SIZE, verbose=False):
     """
     Converts an STL file into a voxel representation with binvox
     
@@ -86,6 +86,7 @@ def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL
                                and return that rather than regenerate (default True)
         size: int, specify bounding box size of produced voxel object where arg N makes NxNxN
                    (default=VOXEL_SIZE)
+        verbose: bool, if true, prints out extra debug statements
 
     Returns:
         str, path to binvox file
@@ -94,7 +95,8 @@ def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL
     binvox_dest = os.path.join(dest_dir, os.path.basename(binvox_output))
     exists = os.path.exists(binvox_dest)
     if check_if_exists and exists:
-        print('Not Voxelizing: Binvox for {} already exists at {}'.format(stl_path, binvox_dest))
+        if verbose:
+            print('Not Voxelizing: Binvox for {} already exists at {}'.format(stl_path, binvox_dest))
         return binvox_dest
     elif exists:
         # overwrite binvox
@@ -106,6 +108,11 @@ def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL
     # convert
     subprocess.run(['../src/data/binvox', '-cb', '-d', str(size), stl_path])
     # binvox will output the binvox file in the same dir as stl_path
+    # check to make sure it worked
+    if not os.path.exists(binvox_output):
+        if verbose:
+            print('binvox failed to convert {}'.format(stl_path))
+        return None
     # here we move it to the desired dest
     os.rename(binvox_output, binvox_dest)
     return binvox_dest

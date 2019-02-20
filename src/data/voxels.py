@@ -17,12 +17,17 @@ def read_voxel_array(vox_file):
     return vox
 
 
-def plot_voxels(vox_data):
+def plot_voxels(vox_data, title=None):
+    
     fig = pyplot.figure(figsize=(10,8))
+    
     ax = fig.gca(projection='3d')
     ax.voxels(vox_data, facecolors='red', edgecolor='k')
-    plt.show()
-    return
+
+    if title is not None:
+        pyplot.title(title, pad=20)
+    
+    pyplot.show()
 
 
 def convert_voxels_to_stl(vox_data):
