@@ -22,7 +22,7 @@ stl.stl.MAX_COUNT = 2000000000
 VOXEL_SIZE = 64
 
 KNOWN_CANNOT_VOXELIZE = [
-    
+    '1228190'
 ]
 
 def plot_mesh(mesh_vectors, title=None):
@@ -76,6 +76,19 @@ def save_vectors_as_stl(vectors, dest):
     new_stl.vectors = vectors
     new_stl.save(dest)
     return
+
+
+def can_voxelize(stl_path):
+    """
+    Will tell you if this stl file can be voxelized or not by consulting a list constructed
+    via past experiences
+    """
+    can_voxel = True
+    for v in KNOWN_CANNOT_VOXELIZE:
+        can_voxel = v not in stl_path
+        if not can_voxel:
+            break
+    return can_voxel
 
 
 def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL_SIZE, verbose=False, timeout=20):

@@ -314,6 +314,8 @@ class Thingi10k(object):
     def voxels_batchmaker(self, batch_size, voxels_dim, verbose=False):
         batch = list()
         for i, stl_file in enumerate(self.df.stl_file):
+            if verbose:
+                print('{}: {}'.format(i, stl_file))
             # read in stl file, read in vectors, apply ops as instructed
             stl_path = os.path.join(self.stl_dir, stl_file)
             vox_path = voxelize_stl(stl_path, dest_dir=os.path.join(VOXELS_DIR, str(voxels_dim)), size=voxels_dim, verbose=verbose)
