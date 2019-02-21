@@ -317,8 +317,8 @@ class Thingi10k(object):
                 # sometimes voxelization can fail, so we skip and move on to the next one
                 continue
             vox = read_voxel_array(vox_path)
-            # convert from bool True/False to int 1/0
-            vox_data = vox.data.astype(int)
+            # convert from bool True/False to float 1/0 (tf likes floats)
+            vox_data = vox.data.astype(np.float32)
             # each element has 1 "channel" aka data point (if RGB color, it would be 3)
             batch.append(np.reshape(vox_data, [voxels_dim, voxels_dim, voxels_dim, 1])) 
             # yield batch if ready; else continue
