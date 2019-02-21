@@ -311,28 +311,6 @@ class Thingi10k(object):
                 batch = list()
         return
     
-    def voxels_batchmaker(self, batch_size, voxels_dim, verbose=False):
-        batch = list()
-        for i, stl_file in enumerate(self.df.stl_file):
-            if verbose:
-                print('{}: {}'.format(i, stl_file))
-            # read in stl file, read in vectors, apply ops as instructed
-            stl_path = os.path.join(self.stl_dir, stl_file)
-            vox_path = voxelize_stl(stl_path, dest_dir=os.path.join(VOXELS_DIR, str(voxels_dim)), size=voxels_dim, verbose=verbose)
-            if vox_path is None:
-                # sometimes voxelization can fail, so we skip and move on to the next one
-                continue
-            vox = read_voxel_array(vox_path)
-            # convert from bool True/False to float 1/0 (tf likes floats)
-            vox_data = vox.data.astype(np.float32)
-            # each element has 1 "channel" aka data point (if RGB color, it would be 3)
-            batch.append(np.reshape(vox_data, [voxels_dim, voxels_dim, voxels_dim, 1])) 
-            # yield batch if ready; else continue
-            if (i+1) % batch_size == 0:
-                yield np.asarray(batch)
-                batch = list()
-        return
-        
     def triangle_sequencer(self, seq_length=1, normalize=True, pad_sequences=True):
         """
         Sequence Generator by Triangle for the Thingi10k dataset
@@ -422,9 +400,9 @@ class Thingi10k(object):
         """
         return self.df.loc[self.df.stl_file == '{}.stl'.format(stl_id), 'title'].iloc[0]
     
-    def vectors(self, n=None, stl_id=None):
+    def get_stl_path(self, n=None, stl_id=None):
         """
-        Retrieves the vectors of the specified stl file
+        Retrieves the stl path of the specified stl file
 
         Note: requires n or stl_id (not both)
 
@@ -441,16 +419,64 @@ class Thingi10k(object):
         if n:
             stl_path = self[n].stl_file
         else:
-            df_stl = df[df.stl_file.str.contains(str(stl_id))]
+            df_stl = self.df[self.df.stl_file.str.contains(str(stl_id))]
             if len(df_stl) > 1:
                 print('warning! more than one stl file matches stl_id={}; returning first match'.format(stl_id))
+            elif len(df_stl) == 0:
+                print('warning! could not find stl_path for n={} or stl_id={}'.format(n, stl_id))
             stl_path = df_stl.iloc[0].stl_file
         stl_path = os.path.join(THINGI10K_STL_DIR, stl_path)
+        return stl_path
+        
+    def vectors(self, n=None, stl_id=None):
+        """
+        Retrieves the vectors of the specified stl file
+
+        Note: requires n or stl_id (not both)
+
+        Args:
+            n: int, row index of stl object to return
+            stl_id: int, stl id number from dataset of object to return
+            
+        Returns:
+            vectors of requested object
+        """
+        stl_path = self.get_stl_path(n=n, stl_id=stl_id)
         vectors = read_mesh_vectors(stl_path)
         return vectors
     
-    def get_stl_path(self, n):
-        return os.path.join(self.stl_dir, self[n].stl_file)
+    def get_voxels(self, voxels_dim, n=None, stl_file=None, verbose=False, shape=None):
+        if n:
+            stl_file = self.get_stl_path(n=n)
+        if verbose:
+            print('{}: {}'.format(i, stl_file))
+        # read in stl file, read in vectors, apply ops as instructed
+        stl_path = os.path.join(self.stl_dir, stl_file)
+        vox_path = voxelize_stl(stl_path, dest_dir=os.path.join(VOXELS_DIR, str(voxels_dim)), size=voxels_dim, verbose=verbose)
+        if vox_path is None:
+            # sometimes voxelization can fail, so we skip and move on to the next one
+            vox_data = None
+        else:
+            vox = read_voxel_array(vox_path)
+            # convert from bool True/False to float 1/0 (tf likes floats)
+            vox_data = vox.data.astype(np.float32)
+            if shape:
+                vox_data = np.reshape(vox_data, shape)
+        return vox_data
+
+    def voxels_batchmaker(self, batch_size, voxels_dim, verbose=False):
+        batch = list()
+        for i, stl_file in enumerate(self.df.stl_file):
+            vox_data = self.get_voxels(voxels_dim, stl_file=stl_file, shape=[voxels_dim, voxels_dim, voxels_dim, 1])
+            if vox_data is None:
+                continue
+            # each element has 1 "channel" aka data point (if RGB color, it would be 3)
+            batch.append(vox_data) 
+            # yield batch if ready; else continue
+            if (i+1) % batch_size == 0:
+                yield np.asarray(batch)
+                batch = list()
+        return
     
     def __getitem__(self, n):
         return self.df.loc[n]

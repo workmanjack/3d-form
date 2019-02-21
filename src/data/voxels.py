@@ -19,7 +19,7 @@ def read_voxel_array(vox_file):
 
 def plot_voxels(vox_data, title=None):
     
-    fig = pyplot.figure(figsize=(10,8))
+    fig = pyplot.figure(figsize=(8,6))
     
     ax = fig.gca(projection='3d')
     ax.voxels(vox_data, facecolors='red', edgecolor='k')
