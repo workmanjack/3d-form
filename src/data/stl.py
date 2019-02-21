@@ -21,6 +21,9 @@ stl.stl.MAX_COUNT = 2000000000
 # default dim size of binvox voxel objects
 VOXEL_SIZE = 64
 
+KNOWN_CANNOT_VOXELIZE = [
+    
+]
 
 def plot_mesh(mesh_vectors, title=None):
     """
@@ -75,7 +78,7 @@ def save_vectors_as_stl(vectors, dest):
     return
 
 
-def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL_SIZE, verbose=False):
+def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL_SIZE, verbose=False, timeout=20):
     """
     Converts an STL file into a voxel representation with binvox
     
@@ -106,14 +109,23 @@ def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL
     if not os.path.exists(binvox_dir):
         os.makedirs(binvox_dir, exist_ok=True)
     # convert
-    subprocess.run(['../src/data/binvox', '-cb', '-d', str(size), stl_path])
+    cmd = ['../src/data/binvox', '-cb', '-d', str(size), stl_path]
+    if verbose:
+        print('running -- {}'.format(' '.join(cmd)))
+    try:
+        subprocess.run(['../src/data/binvox', '-cb', '-d', str(size), stl_path], timeout=20)
+    except subprocess.TimeoutExpired as texp:
+        # marked as true because we want to track these and add them to the KNOWN_CANNOT_VOXELIZE list
+        if True or verbose:
+            print('conversion timed out for {}'.format(stl_path))
     # binvox will output the binvox file in the same dir as stl_path
     # check to make sure it worked
     if not os.path.exists(binvox_output):
         if verbose:
             print('binvox failed to convert {}'.format(stl_path))
-        return None
-    # here we move it to the desired dest
-    os.rename(binvox_output, binvox_dest)
+        binvox_dest = None
+    else:
+        # here we move it to the desired dest
+        os.rename(binvox_output, binvox_dest)
     return binvox_dest
 

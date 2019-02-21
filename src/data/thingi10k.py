@@ -190,6 +190,10 @@ class Thingi10k(object):
         self.df = self.df[:1]
         return
     
+    def filter_by_id(self, stl_id):
+        self.df = self.df[self.df.stl_file.str.contains("{}".format(stl_id))]
+        return
+    
     def filter_by_tag(self, tag):
         """
         Filter dataframe rows down to those that contain "tag"
