@@ -4,6 +4,7 @@ from models import MODEL_DIR
 
 # python & package imports
 import tensorflow as tf
+import numpy as np
 import time
 import os
 
@@ -13,7 +14,7 @@ np.random.seed(12)
 tf.set_random_seed(12)
 
 
-class VariationalAutoencoder():
+class VoxelVae():
     
     def __init__(self, input_dim, latent_dim, learning_rate, keep_prob, verbose=False, 
                  kl_div_loss_weight=5, recon_loss_weight=5e-4, debug=False, ckpt_dir='voxel_vae'):
@@ -436,7 +437,6 @@ class VariationalAutoencoder():
                     
         return decoded
     
-    @deprecated
     def visualize_reconstruction(self, original_x, reconstructed_x, name=None):
         """
         This function was used to visualize the output of each epoch during training.

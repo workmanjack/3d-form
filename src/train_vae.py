@@ -1,4 +1,5 @@
 # project imports
+from models.voxel_vae import VoxelVae
 from data.thingi10k import Thingi10k
 from data.voxels import plot_voxels
 
@@ -42,7 +43,7 @@ def main():
     tf.reset_default_graph()
 
     try:
-        vae = VariationalAutoencoder(input_dim=VOXELS_DIM,
+        vae = VoxelVae(input_dim=VOXELS_DIM,
                                      latent_dim=100,
                                      learning_rate=0.0001,
                                      keep_prob=1.0,
@@ -53,8 +54,7 @@ def main():
 
         generator = lambda: thingi.voxels_batchmaker(batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=False)
 
-        vae.train(generator, epochs=50, input_repeats=1, display_step=1, save_step=10,
-                 viz_data=training_example)
+        vae.train(generator, epochs=50, input_repeats=1, display_step=1, save_step=10)
     except Exception as exc:
         vae.close()
         raise(exc)

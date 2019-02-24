@@ -17,17 +17,29 @@ def read_voxel_array(vox_file):
     return vox
 
 
-def plot_voxels(vox_data, title=None):
+def plot_voxels(vox_data, title=None, figsize=(8,6), color='red'):
+    """
+    Uses matplotlib to create a 3D plot of the provided voxels
     
-    fig = pyplot.figure(figsize=(8,6))
+    Args:
+        vox_data: np.array, cubic array with 1/True for voxel and 0/False for empty space
+        title: (optional) str, title of plot
+        figsize: (optional) tuple of 2 ints, dimension of figure
+        color: (optional), color of voxels
+        
+    Returns:
+        matplotlib pyplot object
+    """    
+    fig = pyplot.figure(figsize=figsize)
     
     ax = fig.gca(projection='3d')
-    ax.voxels(vox_data, facecolors='red', edgecolor='k')
+    ax.voxels(vox_data, facecolors=color, edgecolor='k')
 
     if title is not None:
         pyplot.title(title, pad=20)
     
-    pyplot.show()
+    #pyplot.show()
+    return pyplot
 
 
 def convert_voxels_to_stl(vox_data):
