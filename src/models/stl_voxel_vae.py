@@ -1,0 +1,452 @@
+# project imports
+from models import MODEL_DIR
+
+
+# python & package imports
+import tensorflow as tf
+import time
+import os
+
+
+# set seeds for reproducibility
+np.random.seed(12)
+tf.set_random_seed(12)
+
+
+class VariationalAutoencoder():
+    
+    def __init__(self, input_dim, latent_dim, learning_rate, keep_prob, verbose=False, 
+                 kl_div_loss_weight=5, recon_loss_weight=5e-4, debug=False, ckpt_dir='voxel_vae'):
+        """
+        Args:
+            kl_div_loss_weight: float, weight for KL Divergence loss when computing total loss
+            recon_loss_weight: float, weight for reconstruction loss when computing total loss
+
+        """
+        # network and training params
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        self.learning_rate = learning_rate
+        self.keep_prob = keep_prob
+        self.verbose = verbose
+        self.debug = debug
+        self.kl_div_loss_weight = kl_div_loss_weight
+        self.recon_loss_weight = recon_loss_weight
+        
+        self._input_x = tf.placeholder(tf.float32, shape=(None, self.input_dim, self.input_dim, self.input_dim, 1))
+        self._keep_prob = tf.placeholder(dtype=tf.float32)
+        self._trainable = tf.placeholder(dtype=tf.bool)
+
+        # add ops to this list as a tuple with (<op name>, <op>) to see them executed, returned, and printed
+        # to console during execution
+        self._debug_ops = list()
+        
+        # Construct the TensorFlow Graph
+        self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x, self._keep_prob, self._trainable)
+        self.decoder = self._make_decoder(self.encoder, self._trainable)
+        self.loss, self.optimizer, self.mean_recon, self.mean_kl = self._make_loss(self._input_x, self.decoder, self.enc_mu, self.enc_sig)
+
+        # Initializing the tensor flow variables
+        init = tf.global_variables_initializer()
+        
+        # Setup Model Saving
+        self.ckpt_dir = os.path.join(MODEL_DIR, ckpt_dir)
+        self.saver = tf.train.Saver()
+        self.recons_pre = list()
+        self.recons_post = list()
+        self.losses_kl_div = list()
+        self.losses_recon = list()
+
+        # Launch the session
+        self.sess = tf.InteractiveSession()
+        self.sess.run(init)
+        
+    def _print_shape(self, tensor, name=None):
+        if self.verbose:
+            if not name:
+                name = tensor.name
+            print('{}:'.format(name), tensor.shape)
+        return
+    
+    def _make_encoder(self, input_x, keep_prob, trainable):
+        
+        with tf.variable_scope('encoder', reuse=tf.AUTO_REUSE):
+            # tf conv3d: https://www.tensorflow.org/api_docs/python/tf/layers/conv3d
+            # tf glorot init: https://www.tensorflow.org/api_docs/python/tf/glorot_uniform_initializer
+            conv1 = tf.layers.batch_normalization(tf.layers.conv3d(input_x,
+                                     filters=8,
+                                     kernel_size=[3, 3, 3],
+                                     strides=(1, 1, 1),
+                                     padding='valid',
+                                     activation=tf.nn.elu,
+                                     kernel_initializer=tf.initializers.glorot_uniform()))
+            self._print_shape(conv1)
+            # the Example VAE specifies the activation functions as part of the layer
+            # we specify the activation function as a seperate tensor
+            # it is unknown if this is the preferred method in Tensorflow, but we know
+            # it works from work in the 3D-VAE-GAN notebook
+            # we also take advantage of batch_normalization
+            # more info here:
+            # https://medium.com/@ilango100/batch-normalization-speed-up-neural-network-training-245e39a62f85
+            # with the hope that it gives speed without sacrificing quality
+            # tf batch norm: https://www.tensorflow.org/api_docs/python/tf/layers/batch_normalization
+            # tf elu (exponential linear unit): https://www.tensorflow.org/api_docs/python/tf/nn/elu
+
+            conv2 = tf.layers.batch_normalization(tf.layers.conv3d(conv1,
+                                     filters=16,
+                                     kernel_size=[3, 3, 3],
+                                     strides=(2, 2, 2),
+                                     padding='same',
+                                     activation=tf.nn.elu,
+                                     kernel_initializer=tf.initializers.glorot_uniform()))
+            self._print_shape(conv2)
+
+            conv3 = tf.layers.batch_normalization(tf.layers.conv3d(conv2,
+                                     filters=32,
+                                     kernel_size=[3, 3, 3],
+                                     strides=(1, 1, 1),
+                                     padding='valid',
+                                     activation=tf.nn.elu,
+                                     kernel_initializer=tf.initializers.glorot_uniform()))
+            self._print_shape(conv3)
+
+            conv4 = tf.layers.batch_normalization(tf.layers.conv3d(conv3,
+                                     filters=64,
+                                     kernel_size=[3, 3, 3],
+                                     strides=(2, 2, 2),
+                                     padding='same',
+                                     activation=tf.nn.elu,
+                                     kernel_initializer=tf.initializers.glorot_uniform()))
+            self._print_shape(conv4)
+
+            # Apply one fully-connected layer after Conv3d layers
+            # tf dense layer: https://www.tensorflow.org/api_docs/python/tf/layers/dense
+            dense1 = tf.layers.batch_normalization(tf.layers.dense(conv4,
+                                 units=343,
+                                 activation=tf.nn.elu,
+                                 kernel_initializer=tf.initializers.glorot_uniform()))
+            self._print_shape(dense1)
+            flatten = tf.layers.flatten(tf.nn.dropout(dense1, keep_prob))
+        
+            enc_mu = tf.layers.batch_normalization(tf.layers.dense(flatten,
+                                 units=self.latent_dim,
+                                 activation=None))
+            self._print_shape(enc_mu)
+            enc_sig = tf.layers.batch_normalization(tf.layers.dense(flatten,
+                                 units=self.latent_dim,
+                                 activation=None))
+            self._print_shape(enc_sig)
+                                                  
+            # epsilon is a random draw from the latent space
+            epsilon = tf.random_normal(tf.stack([tf.shape(dense1)[0], self.latent_dim]))
+            self._print_shape(epsilon, 'epsilon')
+            enc_z = enc_mu + tf.multiply(epsilon, tf.exp(enc_sig))
+            self._print_shape(enc_z, 'z')
+        return enc_z, enc_mu, enc_sig
+
+
+        # apply dropout to prevent overtraining
+        # why do we flatten?
+        enc_output = tf.layers.flatten(tf.nn.dropout(network_output, keep_prob), name='enc_output')
+        self._print_shape(enc_output)
+        # transform the network output into the latent vector
+        z_mu = tf.layers.dense(enc_output,
+                         units=self.latent_dim,
+                         # Example VAE does not use an initializer here
+                         #kernel_initializer=tf.initializers.glorot_uniform(),
+                         name='enc_mu')
+        self._print_shape(z_mu)
+
+        # Example VAE uses a custom layer to extract sigma
+        # Here we borrow sigma calc from 3D-VAE-GAN
+        z_sig = 0.5 * tf.layers.dense(enc_output, units=self.latent_dim, name='enc_sig')
+        self._print_shape(z_sig, 'enc_sig')
+
+        # epsilon is a random draw from the latent space
+        epsilon = tf.random_normal(tf.stack([tf.shape(enc_output)[0], self.latent_dim]))
+        self._print_shape(epsilon, 'epsilon')
+        z = z_mu + tf.multiply(epsilon, tf.exp(z_sig))
+        self._print_shape(z, 'z')
+
+        return z, z_mu, z_sig
+    
+    def _make_decoder(self, input_z, trainable):
+        
+        # There is some magic in the Example VAE that adds conditional input based on the
+        # class of the image. We do not have that luxury as we are attempting to do this
+        # with input that lacks classes.
+        # TODO: if poor results, try classes
+        self._print_shape(input_z, 'input_z')
+
+        # Why conv3d_transpose instead of conv3d?
+        #
+        # from https://www.tensorflow.org/api_docs/python/tf/nn/conv3d_transpose,
+        #     "This operation is sometimes called "deconvolution" after Deconvolutional Networks,
+        #      but is actually the transpose (gradient) of conv3d rather than an actual deconvolution."
+        #
+        # conv3d_transpose: https://www.tensorflow.org/api_docs/python/tf/layers/conv3d_transpose
+        dense1 = tf.layers.dense(input_z,
+                                 units=343,
+                                 kernel_initializer=tf.initializers.glorot_uniform(),
+                                 name='dec_dense1')
+        self._print_shape(dense1)
+        lrelu1 = tf.nn.elu(tf.layers.batch_normalization(dense1, training=trainable))
+        self._print_shape(lrelu1)
+
+        #z = tf.reshape(z, (-1, 1, 1, 1, n_latent))
+        reshape_z = tf.reshape(lrelu1, shape=(-1, 7, 7, 7, 1), name='reshape_z')
+        self._print_shape(reshape_z)
+        #print('reshape_z: ', reshape_z.shape)
+        #for value in reshape_z.shape:
+        #    print(type(value))
+
+        conv1 = tf.layers.conv3d_transpose(reshape_z,
+                                           filters=64,
+                                           kernel_size=[3, 3, 3],
+                                           strides=(1, 1, 1),
+                                           padding='same',
+                                           # Example VAE does not mention bias
+                                           use_bias=False,
+                                           kernel_initializer=tf.initializers.glorot_uniform(),
+                                           name='dec_conv1')
+        self._print_shape(conv1)
+        lrelu2 = tf.nn.elu(tf.layers.batch_normalization(conv1, training=trainable), name='dec_lrelu2')
+        self._print_shape(lrelu2)
+
+        conv2 = tf.layers.conv3d_transpose(lrelu2,
+                                           filters=32,
+                                           kernel_size=[3, 3, 3],
+                                           # Example VAE used .5 stride values, but Tensorflow complains
+                                           # of being forced to use a float value here
+                                           #strides=(1.0 / 2, 1.0 / 2, 1.0 / 2),
+                                           strides=(2, 2, 2),
+                                           padding='valid',
+                                           use_bias=False,
+                                           kernel_initializer=tf.initializers.glorot_uniform(),
+                                           name='dec_conv2')
+        self._print_shape(conv2)
+        lrelu3 = tf.nn.elu(tf.layers.batch_normalization(conv2, training=trainable), name='dec_lrelu3')
+        self._print_shape(lrelu3)
+
+        conv3 = tf.layers.conv3d_transpose(lrelu3,
+                                           filters=16,
+                                           kernel_size=[3, 3, 3],
+                                           strides=(1, 1, 1),
+                                           # changed to valid to hit correct dimension
+                                           padding='same',
+                                           use_bias=False,
+                                           kernel_initializer=tf.initializers.glorot_uniform(),
+                                           name='dec_conv3')
+        self._print_shape(conv3)
+        lrelu4 = tf.nn.elu(tf.layers.batch_normalization(conv3, training=trainable), name='dec_lrelu4')
+        self._print_shape(lrelu4)
+
+        conv4 = tf.layers.conv3d_transpose(lrelu4,
+                                           filters=8,
+                                           kernel_size=[4, 4, 4],
+                                           #strides=(1.0 / 2, 1.0 / 2, 1.0 / 2),
+                                           strides=(2, 2, 2),
+                                           padding='valid',
+                                           use_bias=False,
+                                           kernel_initializer=tf.initializers.glorot_uniform(),
+                                           name='dec_conv4')
+        self._print_shape(conv4)
+        lrelu5 = tf.nn.elu(tf.layers.batch_normalization(conv4, training=trainable), name='dec_lrelu5')
+        self._print_shape(lrelu5)
+
+        conv5 = tf.layers.conv3d_transpose(lrelu5,
+                                           filters=1,
+                                           kernel_size=[3, 3, 3],
+                                           strides=(1, 1, 1),
+                                           padding='same',
+                                           use_bias=False,
+                                           kernel_initializer=tf.initializers.glorot_uniform(),
+                                           name='dec_conv5')
+        self._print_shape(conv5)
+        #decoded_output = tf.nn.tanh(conv5)
+        decoded_output = tf.nn.sigmoid(conv5)
+        #decoded_output = tf.clip_by_value(decoded_output, 1e-7, 1.0 - 1e-7)
+        #self._add_debug_op('max decoded_output', tf.math.reduce_max(decoded_output), False)
+        #self._add_debug_op('min decoded_output', tf.math.reduce_min(decoded_output), False)
+        #self._add_debug_op('mean decoded_output', tf.math.reduce_mean(decoded_output), False)
+        #decoded_output = conv5
+        self._print_shape(decoded_output)
+        
+        return decoded_output
+    
+    def _make_loss(self, enc_input, dec_output, z_mu, z_sig):
+        """
+        Info on loss in VAE:
+          * https://stats.stackexchange.com/questions/332179/how-to-weight-kld-loss-vs-reconstruction-loss-in-variational-auto-encoder
+          
+        Args:
+            enc_input: tensor, input tensor into VAE
+            dec_output: tensor, decoded output tensor from VAE
+
+        Return:
+            float, 
+        """
+        
+        # Weighted binary cross-entropy for use in voxel loss. Allows weighting of false positives relative to false negatives.
+        # Nominally set to strongly penalize false negatives
+        # we must clip because values of 0 or 1 will cause errors
+        #clipped_input = tf.clip_by_value(tf.nn.sigmoid(enc_input), 1e-7, 1.0 - 1e-7)
+        clipped_input = tf.clip_by_value(enc_input, 1e-7, 1.0 - 1e-7)
+        clipped_output = tf.clip_by_value(dec_output, 1e-7, 1.0 - 1e-7)
+        #self._add_debug_op('max clipped_input', tf.math.reduce_max(clipped_input), False)
+        #self._add_debug_op('min clipped_input', tf.math.reduce_min(clipped_input), False)
+        #self._add_debug_op('mean clipped_input', tf.math.reduce_mean(clipped_input), False)
+        self._add_debug_op('max clipped_output', tf.math.reduce_max(clipped_output), False)
+        self._add_debug_op('min clipped_output', tf.math.reduce_min(clipped_output), False)
+        self._add_debug_op('mean clipped_output', tf.math.reduce_mean(clipped_output), False)
+        bce = -(98.0 * clipped_input * tf.log(clipped_output) + 2.0 * (1.0 - clipped_input) * tf.log(1.0 - clipped_output)) / 100.0
+        #self._add_debug_op('bce', bce, False)
+        #bce = tf.keras.backend.binary_crossentropy(enc_output, dec_output)
+        
+        # Voxel-Wise Reconstruction Loss 
+        # Note that the output values are clipped to prevent the BCE from evaluating log(0).
+        recon_loss = tf.reduce_mean(bce, 1)
+   
+        #recon_loss = tf.reduce_sum(tf.squared_difference(
+        #    tf.reshape(dec_output, (-1, self.input_dim ** 3)),
+        #    tf.reshape(self._input_x, (-1, self.input_dim ** 3))), 1)
+        
+        kl_divergence = -0.5 * tf.reduce_sum(1.0 + 2.0 * z_sig - z_mu ** 2 - tf.exp(2.0 * z_sig), 1)
+
+        mean_kl = tf.reduce_sum(kl_divergence)
+        #self._add_debug_op('mean_kl', mean_kl, False)
+        mean_recon = tf.reduce_sum(recon_loss)
+        #self._add_debug_op('mean_recon', mean_recon, False)
+
+        # tf reduce_mean: https://www.tensorflow.org/api_docs/python/tf/math/reduce_mean
+        loss = tf.reduce_mean(self.kl_div_loss_weight * kl_divergence + self.recon_loss_weight * recon_loss)
+        #self._add_debug_op('loss', loss, False)
+        # remove kl for fun
+        #loss = tf.reduce_mean(self.recon_loss_weight * recon_loss)
+        
+        #optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(loss)
+        optimizer = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum=0.9, use_nesterov=True).minimize(loss)
+
+        return loss, optimizer, mean_recon, mean_kl
+
+    def _add_debug_op(self, name, op, newline=True):
+        self._debug_ops.append((name, op, newline))
+        return
+
+    def _print_debug_ops(self, results):
+        if self.debug:
+            for i, debug_op in enumerate(self._debug_ops):
+                msg = 'DEBUG_OP "{}": '.format(debug_op[0])
+                if len(debug_op) > 2 and debug_op[2]:
+                    msg += '\n'
+                msg += '{}'.format(results[i])
+                print(msg)
+        return
+
+    def train(self, generator, epochs=10, input_repeats=1, display_step=1, save_step=1, viz_data=None):
+        
+        start = time.time()
+        for epoch_num, epoch in enumerate(range(epochs)):
+
+            for batch_num, batch in enumerate(generator()):
+                
+                if self.verbose:
+                    print('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch_num, batch_num, (time.time() - start) / 60))
+                #print("batch.min()", batch.min())
+                #print("batch.max()", batch.max())
+                # repeat for extra practice on each shape
+                for _ in range(input_repeats):
+
+                    ops = tuple([self.optimizer, self.loss, self.mean_kl, self.mean_recon] + 
+                                [op for name, op, _ in self._debug_ops])
+                    results = self.sess.run(
+                        ops,
+                        feed_dict={self._input_x: batch, self._keep_prob:self.keep_prob, self._trainable: True}
+                    )
+                    _, loss, kl_divergence, recon_loss = results[:4]
+                    self._print_debug_ops(results[4:])
+                    
+                if self.verbose:
+                    #print('\tKL Divergence = {:.5f}, Reconstruction Loss = {:.5f}'.format(kl_divergence, recon_loss))
+                    print('\tKL Divergence = {}, Reconstruction Loss = {}'.format(kl_divergence, recon_loss))
+                
+            if (epoch + 1) % display_step == 0:
+                print("Epoch: {}, ".format(epoch + 1) + 
+                      "Loss = {:.5f}, ".format(loss) + 
+                      "KL Divergence = {:.5f}, ".format(kl_divergence) +
+                      "Reconstruction Loss = {:.5f}, ".format(recon_loss) +
+                      "Elapsed time: {:.2f} mins".format((time.time() - start) / 60))
+                print('Generation Example:')
+                
+                # prepare for generation
+                #print(batch[0][0])
+                if viz_data is not None:
+                    self._print_shape(viz_data, 'Example shape (before reshape)')
+                    recon_input = np.reshape(viz_data, (1, self.input_dim, self.input_dim, self.input_dim, 1))
+                    self._print_shape(recon_input, 'Example shape')
+
+                    # generate!
+                    recon = self.reconstruct(recon_input)
+                    self._print_shape(recon, 'Recon')
+
+                    # prepare for plotting
+                    recon_input = np.reshape(recon_input, (self.input_dim, self.input_dim, self.input_dim))
+                    self._print_shape(recon_input, 'Example shape (for plotting)')
+                    recon = np.reshape(recon, (self.input_dim, self.input_dim, self.input_dim))
+                    self._print_shape(recon, 'Recon (for plotting)')
+                    # network outputs decimals; here we force them to True/False for plotting
+                    self.recons_pre.append(recon)
+                    recon = recon > 0.5
+                    self.recons_post.append(recon)
+                    # replace all nans with zeros
+                    #recon = np.nan_to_num(recon)
+
+                    # save the generated object in case we wish to review later
+                    path = os.path.join(self.ckpt_dir, 'recon_epoch-{}.npy'.format(epoch))
+
+                    # visualize
+                    self.visualize_reconstruction(recon_input, recon)
+
+            if (epoch + 1) % save_step == 0:
+                # Save the variables to disk.
+                save_path = self.saver.save(self.sess, os.path.join(self.ckpt_dir, "model_epoch-{}.ckpt".format(epoch)))
+                print("Model saved in path: {}".format(save_path))
+                                       
+        return
+
+    def restore(self, model_ckpt):
+        self.saver.restore(self.sess, model_ckpt)
+        return
+    
+    def close(self):
+        self.sess.close()
+        return
+            
+    def reconstruct(self, input_x):
+        """
+        Use VAE to reconstruct given data
+        """
+        ops = tuple([self.decoder] + [op for name, op, _ in self._debug_ops])
+                    
+        results = self.sess.run(ops, 
+            feed_dict={self._input_x: input_x, self._keep_prob: 1.0, self._trainable: False})
+        
+        decoded = results[0]
+        self._print_debug_ops(results[1:])
+                    
+        return decoded
+    
+    @deprecated
+    def visualize_reconstruction(self, original_x, reconstructed_x, name=None):
+        """
+        This function was used to visualize the output of each epoch during training.
+        This functionality is being moved to the train_vae.py script.
+        """
+        title = '' if not name else ': {}'.format(name)
+        plot_voxels(original_x, title='Original' + title)
+        plot_voxels(reconstructed_x, title='Autoencoded' + title)
+        return
+
+    def __repr__(self):
+        return '<VariationalAutoencoder(input_dim={}, latent_dim={}, learning_rate={}, keep_prob={})>'.format(
+            self.input_dim, self.latent_dim, self.learning_rate, self.keep_prob)
