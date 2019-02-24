@@ -25,6 +25,7 @@ class VoxelVae():
             recon_loss_weight: float, weight for reconstruction loss when computing total loss
 
         """
+        self.logger = get_logger()
         # network and training params
         self.input_dim = input_dim
         self.latent_dim = latent_dim
@@ -63,11 +64,11 @@ class VoxelVae():
         self.sess = tf.InteractiveSession()
         self.sess.run(init)
         
-    def _print_shape(self, tensor, name=None):
+    def _log_shape(self, tensor, name=None):
         if self.verbose:
             if not name:
                 name = tensor.name
-            print('{}:'.format(name), tensor.shape)
+            self.logger.debug('{}: {}'.format(name, tensor.shape))
         return
     
     def _make_encoder(self, input_x, keep_prob, trainable):
@@ -82,7 +83,7 @@ class VoxelVae():
                                      padding='valid',
                                      activation=tf.nn.elu,
                                      kernel_initializer=tf.initializers.glorot_uniform()))
-            self._print_shape(conv1)
+            self._log_shape(conv1)
             # the Example VAE specifies the activation functions as part of the layer
             # we specify the activation function as a seperate tensor
             # it is unknown if this is the preferred method in Tensorflow, but we know
@@ -101,7 +102,7 @@ class VoxelVae():
                                      padding='same',
                                      activation=tf.nn.elu,
                                      kernel_initializer=tf.initializers.glorot_uniform()))
-            self._print_shape(conv2)
+            self._log_shape(conv2)
 
             conv3 = tf.layers.batch_normalization(tf.layers.conv3d(conv2,
                                      filters=32,
@@ -110,7 +111,7 @@ class VoxelVae():
                                      padding='valid',
                                      activation=tf.nn.elu,
                                      kernel_initializer=tf.initializers.glorot_uniform()))
-            self._print_shape(conv3)
+            self._log_shape(conv3)
 
             conv4 = tf.layers.batch_normalization(tf.layers.conv3d(conv3,
                                      filters=64,
@@ -119,7 +120,7 @@ class VoxelVae():
                                      padding='same',
                                      activation=tf.nn.elu,
                                      kernel_initializer=tf.initializers.glorot_uniform()))
-            self._print_shape(conv4)
+            self._log_shape(conv4)
 
             # Apply one fully-connected layer after Conv3d layers
             # tf dense layer: https://www.tensorflow.org/api_docs/python/tf/layers/dense
@@ -127,48 +128,48 @@ class VoxelVae():
                                  units=343,
                                  activation=tf.nn.elu,
                                  kernel_initializer=tf.initializers.glorot_uniform()))
-            self._print_shape(dense1)
+            self._log_shape(dense1)
             flatten = tf.layers.flatten(tf.nn.dropout(dense1, keep_prob))
         
             enc_mu = tf.layers.batch_normalization(tf.layers.dense(flatten,
                                  units=self.latent_dim,
                                  activation=None))
-            self._print_shape(enc_mu)
+            self._log_shape(enc_mu)
             enc_sig = tf.layers.batch_normalization(tf.layers.dense(flatten,
                                  units=self.latent_dim,
                                  activation=None))
-            self._print_shape(enc_sig)
+            self._log_shape(enc_sig)
                                                   
             # epsilon is a random draw from the latent space
             epsilon = tf.random_normal(tf.stack([tf.shape(dense1)[0], self.latent_dim]))
-            self._print_shape(epsilon, 'epsilon')
+            self._log_shape(epsilon, 'epsilon')
             enc_z = enc_mu + tf.multiply(epsilon, tf.exp(enc_sig))
-            self._print_shape(enc_z, 'z')
+            self._log_shape(enc_z, 'z')
         return enc_z, enc_mu, enc_sig
 
 
         # apply dropout to prevent overtraining
         # why do we flatten?
         enc_output = tf.layers.flatten(tf.nn.dropout(network_output, keep_prob), name='enc_output')
-        self._print_shape(enc_output)
+        self._log_shape(enc_output)
         # transform the network output into the latent vector
         z_mu = tf.layers.dense(enc_output,
                          units=self.latent_dim,
                          # Example VAE does not use an initializer here
                          #kernel_initializer=tf.initializers.glorot_uniform(),
                          name='enc_mu')
-        self._print_shape(z_mu)
+        self._log_shape(z_mu)
 
         # Example VAE uses a custom layer to extract sigma
         # Here we borrow sigma calc from 3D-VAE-GAN
         z_sig = 0.5 * tf.layers.dense(enc_output, units=self.latent_dim, name='enc_sig')
-        self._print_shape(z_sig, 'enc_sig')
+        self._log_shape(z_sig, 'enc_sig')
 
         # epsilon is a random draw from the latent space
         epsilon = tf.random_normal(tf.stack([tf.shape(enc_output)[0], self.latent_dim]))
-        self._print_shape(epsilon, 'epsilon')
+        self._log_shape(epsilon, 'epsilon')
         z = z_mu + tf.multiply(epsilon, tf.exp(z_sig))
-        self._print_shape(z, 'z')
+        self._log_shape(z, 'z')
 
         return z, z_mu, z_sig
     
@@ -178,7 +179,7 @@ class VoxelVae():
         # class of the image. We do not have that luxury as we are attempting to do this
         # with input that lacks classes.
         # TODO: if poor results, try classes
-        self._print_shape(input_z, 'input_z')
+        self._log_shape(input_z, 'input_z')
 
         # Why conv3d_transpose instead of conv3d?
         #
@@ -191,16 +192,13 @@ class VoxelVae():
                                  units=343,
                                  kernel_initializer=tf.initializers.glorot_uniform(),
                                  name='dec_dense1')
-        self._print_shape(dense1)
+        self._log_shape(dense1)
         lrelu1 = tf.nn.elu(tf.layers.batch_normalization(dense1, training=trainable))
-        self._print_shape(lrelu1)
+        self._log_shape(lrelu1)
 
         #z = tf.reshape(z, (-1, 1, 1, 1, n_latent))
         reshape_z = tf.reshape(lrelu1, shape=(-1, 7, 7, 7, 1), name='reshape_z')
-        self._print_shape(reshape_z)
-        #print('reshape_z: ', reshape_z.shape)
-        #for value in reshape_z.shape:
-        #    print(type(value))
+        self._log_shape(reshape_z)
 
         conv1 = tf.layers.conv3d_transpose(reshape_z,
                                            filters=64,
@@ -211,9 +209,9 @@ class VoxelVae():
                                            use_bias=False,
                                            kernel_initializer=tf.initializers.glorot_uniform(),
                                            name='dec_conv1')
-        self._print_shape(conv1)
+        self._log_shape(conv1)
         lrelu2 = tf.nn.elu(tf.layers.batch_normalization(conv1, training=trainable), name='dec_lrelu2')
-        self._print_shape(lrelu2)
+        self._log_shape(lrelu2)
 
         conv2 = tf.layers.conv3d_transpose(lrelu2,
                                            filters=32,
@@ -226,9 +224,9 @@ class VoxelVae():
                                            use_bias=False,
                                            kernel_initializer=tf.initializers.glorot_uniform(),
                                            name='dec_conv2')
-        self._print_shape(conv2)
+        self._log_shape(conv2)
         lrelu3 = tf.nn.elu(tf.layers.batch_normalization(conv2, training=trainable), name='dec_lrelu3')
-        self._print_shape(lrelu3)
+        self._log_shape(lrelu3)
 
         conv3 = tf.layers.conv3d_transpose(lrelu3,
                                            filters=16,
@@ -239,9 +237,9 @@ class VoxelVae():
                                            use_bias=False,
                                            kernel_initializer=tf.initializers.glorot_uniform(),
                                            name='dec_conv3')
-        self._print_shape(conv3)
+        self._log_shape(conv3)
         lrelu4 = tf.nn.elu(tf.layers.batch_normalization(conv3, training=trainable), name='dec_lrelu4')
-        self._print_shape(lrelu4)
+        self._log_shape(lrelu4)
 
         conv4 = tf.layers.conv3d_transpose(lrelu4,
                                            filters=8,
@@ -252,9 +250,9 @@ class VoxelVae():
                                            use_bias=False,
                                            kernel_initializer=tf.initializers.glorot_uniform(),
                                            name='dec_conv4')
-        self._print_shape(conv4)
+        self._log_shape(conv4)
         lrelu5 = tf.nn.elu(tf.layers.batch_normalization(conv4, training=trainable), name='dec_lrelu5')
-        self._print_shape(lrelu5)
+        self._log_shape(lrelu5)
 
         conv5 = tf.layers.conv3d_transpose(lrelu5,
                                            filters=1,
@@ -264,7 +262,7 @@ class VoxelVae():
                                            use_bias=False,
                                            kernel_initializer=tf.initializers.glorot_uniform(),
                                            name='dec_conv5')
-        self._print_shape(conv5)
+        self._log_shape(conv5)
         #decoded_output = tf.nn.tanh(conv5)
         decoded_output = tf.nn.sigmoid(conv5)
         #decoded_output = tf.clip_by_value(decoded_output, 1e-7, 1.0 - 1e-7)
@@ -272,7 +270,7 @@ class VoxelVae():
         #self._add_debug_op('min decoded_output', tf.math.reduce_min(decoded_output), False)
         #self._add_debug_op('mean decoded_output', tf.math.reduce_mean(decoded_output), False)
         #decoded_output = conv5
-        self._print_shape(decoded_output)
+        self._log_shape(decoded_output)
         
         return decoded_output
     
@@ -335,14 +333,14 @@ class VoxelVae():
         self._debug_ops.append((name, op, newline))
         return
 
-    def _print_debug_ops(self, results):
+    def _log_debug_ops(self, results):
         if self.debug:
             for i, debug_op in enumerate(self._debug_ops):
                 msg = 'DEBUG_OP "{}": '.format(debug_op[0])
                 if len(debug_op) > 2 and debug_op[2]:
                     msg += '\n'
                 msg += '{}'.format(results[i])
-                print(msg)
+                self.logger.debug(msg)
         return
 
     def train(self, generator, epochs=10, input_repeats=1, display_step=1, save_step=1, viz_data=None):
@@ -353,9 +351,7 @@ class VoxelVae():
             for batch_num, batch in enumerate(generator()):
                 
                 if self.verbose:
-                    print('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch_num, batch_num, (time.time() - start) / 60))
-                #print("batch.min()", batch.min())
-                #print("batch.max()", batch.max())
+                    self.logger.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch_num, batch_num, (time.time() - start) / 60))
                 # repeat for extra practice on each shape
                 for _ in range(input_repeats):
 
@@ -366,36 +362,35 @@ class VoxelVae():
                         feed_dict={self._input_x: batch, self._keep_prob:self.keep_prob, self._trainable: True}
                     )
                     _, loss, kl_divergence, recon_loss = results[:4]
-                    self._print_debug_ops(results[4:])
+                    self._log_debug_ops(results[4:])
                     
                 if self.verbose:
                     #print('\tKL Divergence = {:.5f}, Reconstruction Loss = {:.5f}'.format(kl_divergence, recon_loss))
-                    print('\tKL Divergence = {}, Reconstruction Loss = {}'.format(kl_divergence, recon_loss))
+                    self.logger.debug('\tKL Divergence = {}, Reconstruction Loss = {}'.format(kl_divergence, recon_loss))
                 
             if (epoch + 1) % display_step == 0:
-                print("Epoch: {}, ".format(epoch + 1) + 
+                self.logger.info("Epoch: {}, ".format(epoch + 1) + 
                       "Loss = {:.5f}, ".format(loss) + 
                       "KL Divergence = {:.5f}, ".format(kl_divergence) +
                       "Reconstruction Loss = {:.5f}, ".format(recon_loss) +
                       "Elapsed time: {:.2f} mins".format((time.time() - start) / 60))
-                print('Generation Example:')
                 
                 # prepare for generation
-                #print(batch[0][0])
                 if viz_data is not None:
-                    self._print_shape(viz_data, 'Example shape (before reshape)')
+                    self.logger.info('Generation Example:')
+                    self._log_shape(viz_data, 'Example shape (before reshape)')
                     recon_input = np.reshape(viz_data, (1, self.input_dim, self.input_dim, self.input_dim, 1))
-                    self._print_shape(recon_input, 'Example shape')
+                    self._log_shape(recon_input, 'Example shape')
 
                     # generate!
                     recon = self.reconstruct(recon_input)
-                    self._print_shape(recon, 'Recon')
+                    self._log_shape(recon, 'Recon')
 
                     # prepare for plotting
                     recon_input = np.reshape(recon_input, (self.input_dim, self.input_dim, self.input_dim))
-                    self._print_shape(recon_input, 'Example shape (for plotting)')
+                    self._log_shape(recon_input, 'Example shape (for plotting)')
                     recon = np.reshape(recon, (self.input_dim, self.input_dim, self.input_dim))
-                    self._print_shape(recon, 'Recon (for plotting)')
+                    self._log_shape(recon, 'Recon (for plotting)')
                     # network outputs decimals; here we force them to True/False for plotting
                     self.recons_pre.append(recon)
                     recon = recon > 0.5
@@ -412,7 +407,7 @@ class VoxelVae():
             if (epoch + 1) % save_step == 0:
                 # Save the variables to disk.
                 save_path = self.saver.save(self.sess, os.path.join(self.ckpt_dir, "model_epoch-{}.ckpt".format(epoch)))
-                print("Model saved in path: {}".format(save_path))
+                self.logger.info("Model saved in path: {}".format(save_path))
                                        
         return
 
@@ -434,7 +429,7 @@ class VoxelVae():
             feed_dict={self._input_x: input_x, self._keep_prob: 1.0, self._trainable: False})
         
         decoded = results[0]
-        self._print_debug_ops(results[1:])
+        self._log_debug_ops(results[1:])
                     
         return decoded
     
