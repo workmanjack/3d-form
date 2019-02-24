@@ -2,6 +2,7 @@
 from models.voxel_vae import VoxelVae
 from data.thingi10k import Thingi10k
 from data.voxels import plot_voxels
+from utils import get_logger
 
 
 # python & package imports
@@ -17,6 +18,9 @@ tf.set_random_seed(12)
 
 def main():
 
+    logger = get_logger()
+    logger.info('Starting train_vae main')
+    
     ### Get Dataset
 
     thingi = Thingi10k.init10k(pctile=.9)
@@ -27,14 +31,14 @@ def main():
     #thingi = Thingi10k.init10()
     #thingi = Thingi10k.init10(pctile=.1)
     n_input = len(thingi)
-    print(n_input)
+    logger.info('Thingi10k n_input={}'.format(n_input))
     
     ### Prepare for Training
 
     VOXELS_DIM = 32
     BATCH_SIZE = 22
-    print('Num input = {}'.format(n_input))
-    print('Num batches per epoch = {:.2f}'.format(n_input / BATCH_SIZE))
+    logger.info('Num input = {}'.format(n_input))
+    logger.info('Num batches per epoch = {:.2f}'.format(n_input / BATCH_SIZE))
     training_example = thingi.get_voxels(VOXELS_DIM, stl_file=thingi.get_stl_path(stl_id=126660))
     plot_voxels(training_example)
     
@@ -56,6 +60,7 @@ def main():
 
         vae.train(generator, epochs=50, input_repeats=1, display_step=1, save_step=10)
     except Exception as exc:
+        logger.exception('Failed to train vae')
         vae.close()
         raise(exc)
         
@@ -69,6 +74,8 @@ def main():
     recon = np.reshape(recon, [VOXELS_DIM, VOXELS_DIM, VOXELS_DIM])
     recon = recon > 0.065
     plot_voxels(recon)
+
+    logger.info('Done train_vae.py main')
 
     return
 

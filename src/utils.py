@@ -1,10 +1,49 @@
 import requests
+import datetime
+import logging
 import os
 
 
-PROJECT_ROOT = os.path.join(os.path.realpath(os.path.dirname(__file__)), '..')
+SRC_ROOT = os.path.realpath(os.path.dirname(__file__))
+PROJECT_ROOT = os.path.join(SRC_ROOT, '..')
+LOGS_DIR = os.path.join(SRC_ROOT, 'logs')
 
-             
+
+def get_logger(logname='root', verbosity=1):
+    """
+    Good intro to logging in python:
+    https://fangpenlin.com/posts/2012/08/26/good-logging-practice-in-python/
+    
+    Inspiration for this function:
+    https://stackoverflow.com/questions/7621897/python-logging-module-globally
+    """
+    
+    logger = logging.getLogger(logname)
+
+    level = logging.INFO
+    if verbosity is not None and int(verbosity) > 0:
+        level = logging.DEBUG
+
+    logger.setLevel(logging.DEBUG)  # we adjust on console and file later
+    # create file handler which logs even debug messages (and make sure logs dir exists)
+    if not os.path.exists(LOGS_DIR):
+        os.makedirs(LOGS_DIR)
+    fh = logging.FileHandler(datetime.datetime.now().strftime(os.path.join(LOGS_DIR, '%Y-%m-%d_%H-%M__{}.log'.format(logname))), 'w', 'utf-8')
+    fh.setLevel(logging.DEBUG)  # always log everything to file
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(level)  # only log to console what the user wants
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s: %(message)s')
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+    # add the handlers to the logger
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
+    return logger
+
+
 def api_json(url):
     """
     Returns json data from the provided url

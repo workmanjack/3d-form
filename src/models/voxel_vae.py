@@ -1,4 +1,5 @@
 # project imports
+from utils import get_logger
 from models import MODEL_DIR
 
 
