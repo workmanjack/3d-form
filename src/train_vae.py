@@ -8,6 +8,7 @@ from utils import get_logger
 # python & package imports
 import tensorflow as tf
 import numpy as np
+import logging.config
 import os
 
 
@@ -18,8 +19,8 @@ tf.set_random_seed(12)
 
 def main():
 
-    logger = get_logger()
-    logger.info('Starting train_vae main')
+    get_logger()
+    logging.info('Starting train_vae main')
     
     ### Get Dataset
 
@@ -31,14 +32,14 @@ def main():
     #thingi = Thingi10k.init10()
     #thingi = Thingi10k.init10(pctile=.1)
     n_input = len(thingi)
-    logger.info('Thingi10k n_input={}'.format(n_input))
+    logging.info('Thingi10k n_input={}'.format(n_input))
     
     ### Prepare for Training
 
     VOXELS_DIM = 32
     BATCH_SIZE = 22
-    logger.info('Num input = {}'.format(n_input))
-    logger.info('Num batches per epoch = {:.2f}'.format(n_input / BATCH_SIZE))
+    logging.info('Num input = {}'.format(n_input))
+    logging.info('Num batches per epoch = {:.2f}'.format(n_input / BATCH_SIZE))
     training_example = thingi.get_voxels(VOXELS_DIM, stl_file=thingi.get_stl_path(stl_id=126660))
     plot_voxels(training_example)
     
@@ -60,7 +61,7 @@ def main():
 
         vae.train(generator, epochs=50, input_repeats=1, display_step=1, save_step=10)
     except Exception as exc:
-        logger.exception('Failed to train vae')
+        logging.exception('Failed to train vae')
         vae.close()
         raise(exc)
         
@@ -75,7 +76,7 @@ def main():
     recon = recon > 0.065
     plot_voxels(recon)
 
-    logger.info('Done train_vae.py main')
+    logging.info('Done train_vae.py main')
 
     return
 

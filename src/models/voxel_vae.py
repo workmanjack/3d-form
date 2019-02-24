@@ -1,10 +1,10 @@
 # project imports
-from utils import get_logger
 from models import MODEL_DIR
 
 
 # python & package imports
 import tensorflow as tf
+import logging.config
 import numpy as np
 import time
 import os
@@ -24,8 +24,8 @@ class VoxelVae():
             kl_div_loss_weight: float, weight for KL Divergence loss when computing total loss
             recon_loss_weight: float, weight for reconstruction loss when computing total loss
 
-        """
-        self.logger = get_logger()
+        """ 
+        logging.info('Initializing VoxelVae')
         # network and training params
         self.input_dim = input_dim
         self.latent_dim = latent_dim
@@ -68,7 +68,7 @@ class VoxelVae():
         if self.verbose:
             if not name:
                 name = tensor.name
-            self.logger.debug('{}: {}'.format(name, tensor.shape))
+            logging.debug('{}: {}'.format(name, tensor.shape))
         return
     
     def _make_encoder(self, input_x, keep_prob, trainable):
@@ -340,7 +340,7 @@ class VoxelVae():
                 if len(debug_op) > 2 and debug_op[2]:
                     msg += '\n'
                 msg += '{}'.format(results[i])
-                self.logger.debug(msg)
+                logging.debug(msg)
         return
 
     def train(self, generator, epochs=10, input_repeats=1, display_step=1, save_step=1, viz_data=None):
@@ -351,7 +351,7 @@ class VoxelVae():
             for batch_num, batch in enumerate(generator()):
                 
                 if self.verbose:
-                    self.logger.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch_num, batch_num, (time.time() - start) / 60))
+                    logging.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch_num, batch_num, (time.time() - start) / 60))
                 # repeat for extra practice on each shape
                 for _ in range(input_repeats):
 
@@ -366,10 +366,10 @@ class VoxelVae():
                     
                 if self.verbose:
                     #print('\tKL Divergence = {:.5f}, Reconstruction Loss = {:.5f}'.format(kl_divergence, recon_loss))
-                    self.logger.debug('\tKL Divergence = {}, Reconstruction Loss = {}'.format(kl_divergence, recon_loss))
+                    logging.debug('\tKL Divergence = {}, Reconstruction Loss = {}'.format(kl_divergence, recon_loss))
                 
             if (epoch + 1) % display_step == 0:
-                self.logger.info("Epoch: {}, ".format(epoch + 1) + 
+                logging.info("Epoch: {}, ".format(epoch + 1) + 
                       "Loss = {:.5f}, ".format(loss) + 
                       "KL Divergence = {:.5f}, ".format(kl_divergence) +
                       "Reconstruction Loss = {:.5f}, ".format(recon_loss) +
@@ -377,7 +377,7 @@ class VoxelVae():
                 
                 # prepare for generation
                 if viz_data is not None:
-                    self.logger.info('Generation Example:')
+                    logging.info('Generation Example:')
                     self._log_shape(viz_data, 'Example shape (before reshape)')
                     recon_input = np.reshape(viz_data, (1, self.input_dim, self.input_dim, self.input_dim, 1))
                     self._log_shape(recon_input, 'Example shape')
@@ -407,7 +407,7 @@ class VoxelVae():
             if (epoch + 1) % save_step == 0:
                 # Save the variables to disk.
                 save_path = self.saver.save(self.sess, os.path.join(self.ckpt_dir, "model_epoch-{}.ckpt".format(epoch)))
-                self.logger.info("Model saved in path: {}".format(save_path))
+                logging.info("Model saved in path: {}".format(save_path))
                                        
         return
 
