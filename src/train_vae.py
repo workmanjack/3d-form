@@ -12,12 +12,13 @@ import tensorflow as tf
 import numpy as np
 import logging.config
 import json
+import sys
 import os
 
 
 ex = Experiment(name='sacred-testing')
 ex.observers.append(FileStorageObserver.create('experiments'))
-ex.add_config('configs/config1.json')
+#ex.add_config('configs/config1.json')
 
 
 # set seeds for reproducibility
@@ -57,8 +58,9 @@ def main(cfg):
     logging.info('Num input = {}'.format(n_input))
     logging.info('Num batches per epoch = {:.2f}'.format(n_input / BATCH_SIZE))
     
+    stl_example = thingi.get_stl_path(stl_id=cfg_voxel_vae.get('example_stl_id'))
     training_example = thingi.get_voxels(VOXELS_DIM,
-                                         stl_file=thingi.get_stl_path(stl_id=cfg_voxel_vae.get('example_stl_id')))
+                                         stl_file=stl_example)
     
     plot_voxels(training_example)
     
@@ -93,19 +95,19 @@ def main(cfg):
         
     ### Test Model
     
-    vox_data = thingi.get_voxels(
-        VOXELS_DIM,
-        stl_file=cfg_voxel_vae.get('example_stl_id'),
-        shape=[-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1])
-    recon = vae.reconstruct(vox_data)
-    recon = np.reshape(recon, [VOXELS_DIM, VOXELS_DIM, VOXELS_DIM])
-    recon = recon > cfg.get('voxel_prob_threshold')
-    plot_voxels(recon)
+    #vox_data = thingi.get_voxels(
+    #    VOXELS_DIM,
+    #    stl_file=stl_example,
+    #    shape=[-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1])
+    #recon = vae.reconstruct(vox_data)
+    #recon = np.reshape(recon, [VOXELS_DIM, VOXELS_DIM, VOXELS_DIM])
+    #recon = recon > cfg_voxel_vae.get('voxel_prob_threshold')
+    #plot_voxels(recon)
 
     logging.info('Done train_vae.py main')
 
     return
 
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#s    main()

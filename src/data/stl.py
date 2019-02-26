@@ -22,7 +22,7 @@ stl.stl.MAX_COUNT = 2000000000
 VOXEL_SIZE = 64
 
 KNOWN_CANNOT_VOXELIZE = [
-    '1228190'
+    '1228190', '65278', '65282', '44498', '43987', '43988', '65281', '65279', '43989'
 ]
 
 def plot_mesh(mesh_vectors, title=None):
@@ -83,11 +83,9 @@ def can_voxelize(stl_path):
     Will tell you if this stl file can be voxelized or not by consulting a list constructed
     via past experiences
     """
-    can_voxel = True
-    for v in KNOWN_CANNOT_VOXELIZE:
-        can_voxel = v not in stl_path
-        if not can_voxel:
-            break
+    stl_id = os.path.splitext(os.path.basename(stl_path))[0]
+    #print('STL_ID:', stl_id)
+    can_voxel = not str(stl_id) in KNOWN_CANNOT_VOXELIZE
     return can_voxel
 
 
@@ -107,6 +105,9 @@ def voxelize_stl(stl_path, dest_dir=VOXELS_DIR, check_if_exists=True, size=VOXEL
     Returns:
         str, path to binvox file
     """
+    # first make sure that this stl is voxelizeable
+    if not can_voxelize(stl_path):
+        return None
     binvox_output = stl_path.replace('.stl', '.binvox')
     binvox_dest = os.path.join(dest_dir, os.path.basename(binvox_output))
     exists = os.path.exists(binvox_dest)
