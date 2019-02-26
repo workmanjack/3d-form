@@ -3,6 +3,7 @@ from models import MODEL_DIR
 
 
 # python & package imports
+from collections import defaultdict
 import tensorflow as tf
 import logging.config
 import numpy as np
@@ -57,8 +58,7 @@ class VoxelVae():
         self.saver = tf.train.Saver()
         self.recons_pre = list()
         self.recons_post = list()
-        self.losses_kl_div = list()
-        self.losses_recon = list()
+        self.metrics = defaultdict(dict)
 
         # Launch the session
         self.sess = tf.InteractiveSession()
@@ -368,12 +368,22 @@ class VoxelVae():
                     #print('\tKL Divergence = {:.5f}, Reconstruction Loss = {:.5f}'.format(kl_divergence, recon_loss))
                     logging.debug('\tKL Divergence = {}, Reconstruction Loss = {}'.format(kl_divergence, recon_loss))
                 
+
+            elapsed_time = (time.time() - start) / 60
+            # save the epoch's data for review later
+            self.metrics['epoch' + str(epoch)] = {
+                'loss': loss,
+                'kl_divergence': kl_divergence,
+                'reconstruction_loss': recon_loss,
+                'elapsed_time': elapsed_time 
+            }
+
             if (epoch + 1) % display_step == 0:
                 logging.info("Epoch: {}, ".format(epoch + 1) + 
                       "Loss = {:.5f}, ".format(loss) + 
                       "KL Divergence = {:.5f}, ".format(kl_divergence) +
                       "Reconstruction Loss = {:.5f}, ".format(recon_loss) +
-                      "Elapsed time: {:.2f} mins".format((time.time() - start) / 60))
+                      "Elapsed time: {:.2f} mins".format(elapsed_time))
                 
                 # prepare for generation
                 if viz_data is not None:

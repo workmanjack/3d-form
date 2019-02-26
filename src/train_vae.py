@@ -16,7 +16,7 @@ import sys
 import os
 
 
-ex = Experiment(name='sacred-testing')
+ex = Experiment(name='voxel_vae')
 ex.observers.append(FileStorageObserver.create('experiments'))
 #ex.add_config('configs/config1.json')
 
@@ -87,6 +87,9 @@ def main(cfg):
                   input_repeats=cfg_voxel_vae.get('input_repeats'),
                   display_step=cfg_voxel_vae.get('display_step'),
                   save_step=cfg_voxel_vae.get('save_step'))
+        
+        ex.info['metrics'] = vae.metrics
+        ex.info['model_dir'] = vae.ckpt_dir
 
     except Exception as exc:
         logging.exception('Failed to train vae')
