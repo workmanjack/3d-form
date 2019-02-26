@@ -15,7 +15,7 @@ import json
 import os
 
 
-ex = Experiment()
+ex = Experiment(name='sacred-testing')
 ex.observers.append(FileStorageObserver.create('experiments'))
 ex.add_config('configs/config1.json')
 
@@ -33,24 +33,33 @@ def main(cfg):
     
     ### Get Dataset
 
-    thingi = Thingi10k.initFromIndex(index=cfg.get('dataset').get('index'),
-                                     pctile=cfg.get('dataset').get('pctile', None))
+    index_file = cfg.get('dataset').get('index')
+    pctile = cfg.get('dataset').get('pctile', None)
+    logging.info('Using thingi10k with index {} and pctile {}'.format(index_file, pctile))
+    thingi = Thingi10k.initFromIndex(index=index_file,
+                                     pctile=pctile)
     # apply filter
-    #thingi.filter_by_id(1351747)
     tag = cfg.get('dataset').get('tag', None)
     if tag:
+        logging.info('Filtering thingi10k by tag: {}'.format(tag))
         thingi.filter_by_tag(tag)
+    #thingi.filter_by_id(1351747)
+
     n_input = len(thingi)
     logging.info('Thingi10k n_input={}'.format(n_input))
     
-    return
     ### Prepare for Training
 
-    VOXELS_DIM = 32
-    BATCH_SIZE = 22
+    cfg_voxel_vae = cfg.get('voxel_vae')
+    VOXELS_DIM = cfg_voxel_vae.get('voxels_dim')
+    BATCH_SIZE = cfg_voxel_vae.get('batch_size')
+    
     logging.info('Num input = {}'.format(n_input))
     logging.info('Num batches per epoch = {:.2f}'.format(n_input / BATCH_SIZE))
-    training_example = thingi.get_voxels(VOXELS_DIM, stl_file=thingi.get_stl_path(stl_id=126660))
+    
+    training_example = thingi.get_voxels(VOXELS_DIM,
+                                         stl_file=thingi.get_stl_path(stl_id=cfg_voxel_vae.get('example_stl_id')))
+    
     plot_voxels(training_example)
     
     ### Train
@@ -59,17 +68,24 @@ def main(cfg):
 
     try:
         vae = VoxelVae(input_dim=VOXELS_DIM,
-                                     latent_dim=100,
-                                     learning_rate=0.0001,
-                                     keep_prob=1.0,
-                                     kl_div_loss_weight=1,
-                                     recon_loss_weight=1e4,
-                                     verbose=True,
-                                     debug=True)
+                       latent_dim=cfg_voxel_vae.get('latent_dim'),
+                       learning_rate=cfg_voxel_vae.get('learning_rate'),
+                       keep_prob=cfg_voxel_vae.get('keep_prob'),
+                       kl_div_loss_weight=cfg_voxel_vae.get('kl_div_loss_weight'),
+                       recon_loss_weight=cfg_voxel_vae.get('recon_loss_weight'),
+                       verbose=cfg_voxel_vae.get('verbose'),
+                       debug=cfg_voxel_vae.get('debug'))
 
-        generator = lambda: thingi.voxels_batchmaker(batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=False)
+        generator = lambda: thingi.voxels_batchmaker(batch_size=BATCH_SIZE,
+                                                     voxels_dim=VOXELS_DIM,
+                                                     verbose=cfg_voxel_vae.get('generator_verbose'))
 
-        vae.train(generator, epochs=50, input_repeats=1, display_step=1, save_step=10)
+        vae.train(generator,
+                  epochs=cfg_voxel_vae.get('epochs'),
+                  input_repeats=cfg_voxel_vae.get('input_repeats'),
+                  display_step=cfg_voxel_vae.get('display_step'),
+                  save_step=cfg_voxel_vae.get('save_step'))
+
     except Exception as exc:
         logging.exception('Failed to train vae')
         vae.close()
@@ -79,11 +95,11 @@ def main(cfg):
     
     vox_data = thingi.get_voxels(
         VOXELS_DIM,
-        stl_file=thingi.get_stl_path(stl_id=126660),
+        stl_file=cfg_voxel_vae.get('example_stl_id'),
         shape=[-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1])
     recon = vae.reconstruct(vox_data)
     recon = np.reshape(recon, [VOXELS_DIM, VOXELS_DIM, VOXELS_DIM])
-    recon = recon > 0.065
+    recon = recon > cfg.get('voxel_prob_threshold')
     plot_voxels(recon)
 
     logging.info('Done train_vae.py main')
