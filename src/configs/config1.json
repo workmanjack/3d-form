@@ -1,0 +1,8 @@
+{
+    "cfg": {
+        "dataset": {
+            "index": "../data/processed/thingi10k_index_1000.csv",
+            "tag": "animal"
+        }
+    }
+}

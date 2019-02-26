@@ -1,15 +1,23 @@
 # project imports
+from utils import get_logger, read_json_data
 from models.voxel_vae import VoxelVae
 from data.thingi10k import Thingi10k
 from data.voxels import plot_voxels
-from utils import get_logger
 
 
 # python & package imports
+from sacred.observers import FileStorageObserver
+from sacred import Experiment
 import tensorflow as tf
 import numpy as np
 import logging.config
+import json
 import os
+
+
+ex = Experiment()
+ex.observers.append(FileStorageObserver.create('experiments'))
+ex.add_config('configs/config1.json')
 
 
 # set seeds for reproducibility
@@ -17,23 +25,25 @@ np.random.seed(12)
 tf.set_random_seed(12)
 
 
-def main():
+@ex.automain
+def main(cfg):
 
     get_logger()
     logging.info('Starting train_vae main')
     
     ### Get Dataset
 
-    thingi = Thingi10k.init10k(pctile=.9)
+    thingi = Thingi10k.initFromIndex(index=cfg.get('dataset').get('index'),
+                                     pctile=cfg.get('dataset').get('pctile', None))
     # apply filter
     #thingi.filter_by_id(1351747)
-    thingi.filter_by_tag('animal')
-    #thingi.filter_to_just_one()
-    #thingi = Thingi10k.init10()
-    #thingi = Thingi10k.init10(pctile=.1)
+    tag = cfg.get('dataset').get('tag', None)
+    if tag:
+        thingi.filter_by_tag(tag)
     n_input = len(thingi)
     logging.info('Thingi10k n_input={}'.format(n_input))
     
+    return
     ### Prepare for Training
 
     VOXELS_DIM = 32
