@@ -77,5 +77,21 @@ def api_json(url):
     return data
 
 
+def read_json_data(path):
+    """
+    Reads json data from specified path
+    
+    Args:
+        path: str, path to json file
+        
+    Returns:
+        dict or None depending on if file exists
+    """
+    data = None
+    if os.path.exists(path):
+        with open(path) as f:
+            data = json.load(f)
+    return data
+
 def dataframe_pctile_slice(df, col, pctile):
     return df[df[col] < df[col].quantile(pctile)]
