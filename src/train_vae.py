@@ -57,11 +57,13 @@ def main(cfg):
     logging.info('Num input = {}'.format(n_input))
     logging.info('Num batches per epoch = {:.2f}'.format(n_input / BATCH_SIZE))
     
-    stl_example = thingi.get_stl_path(stl_id=cfg_voxel_vae.get('example_stl_id'))
-    training_example = thingi.get_voxels(VOXELS_DIM,
-                                         stl_file=stl_example)
-    
-    plot_voxels(training_example)
+    example_stl_id = cfg_voxel_vae.get('example_stl_id', None)
+    if example_stl_id:
+        stl_example = thingi.get_stl_path(stl_id=cfg_voxel_vae.get('example_stl_id'))
+        training_example = thingi.get_voxels(VOXELS_DIM,
+                                             stl_file=stl_example)
+
+        plot_voxels(training_example)
     
     ### Train
     
