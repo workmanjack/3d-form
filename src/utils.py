@@ -20,8 +20,8 @@ def get_logger(logname='root', verbosity=1):
     How to use dictConfig:
     https://stackoverflow.com/questions/7507825/where-is-a-complete-example-of-logging-config-dictconfigs
     """
-    #logfile = datetime.datetime.now().strftime(os.path.join(LOGS_DIR, '%Y-%m-%d_%H-%M__{}.log'.format(logname)))
-    logfile = datetime.datetime.now().strftime(os.path.join(LOGS_DIR, '{}.log'.format(logname)))
+    logfile = datetime.datetime.now().strftime(os.path.join(LOGS_DIR, '%Y-%m-%d_%H-%M__{}.log'.format(logname)))
+    #logfile = datetime.datetime.now().strftime(os.path.join(LOGS_DIR, '{}.log'.format(logname)))
     
     DEFAULT_LOGGING = {
         'version': 1,
