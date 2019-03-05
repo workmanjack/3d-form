@@ -1,0 +1,26 @@
+{
+    "cfg": {
+        "dataset": {
+            "index": "../data/processed/thingi10k_index.csv",
+            "pctile": 0.9
+        },
+        "voxel_vae": {
+            "voxels_dim": 32,
+            "batch_size": 64,
+            "example_stl_id": 126660,
+            "voxel_prob_threshold": 0.065,
+            "learning_rate": 0.0001,
+            "keep_prob": 0.8,
+            "kl_div_loss_weight": 1,
+            "recon_loss_weight": 10000,            
+            "latent_dim": 100,
+            "verbose": true,
+            "debug": true,
+            "generator_verbose": false,
+            "epochs": 50,
+            "input_repeats": 1,
+            "display_step": 1,
+            "save_step": 10
+        }
+    }
+}
