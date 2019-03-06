@@ -88,211 +88,217 @@ class VoxelVaegan():
     
     def _make_encoder(self, input_x, keep_prob, trainable):
         
-        # tf conv3d: https://www.tensorflow.org/api_docs/python/tf/layers/conv3d
-        # tf glorot init: https://www.tensorflow.org/api_docs/python/tf/glorot_uniform_initializer
-        conv1 = tf.layers.batch_normalization(tf.layers.conv3d(input_x,
-                                 filters=8,
-                                 kernel_size=[3, 3, 3],
-                                 strides=(1, 1, 1),
-                                 padding='valid',
+        with tf.variable_scope('encoder', reuse=tf.AUTO_REUSE):
+        
+            # tf conv3d: https://www.tensorflow.org/api_docs/python/tf/layers/conv3d
+            # tf glorot init: https://www.tensorflow.org/api_docs/python/tf/glorot_uniform_initializer
+            conv1 = tf.layers.batch_normalization(tf.layers.conv3d(input_x,
+                                     filters=8,
+                                     kernel_size=[3, 3, 3],
+                                     strides=(1, 1, 1),
+                                     padding='valid',
+                                     activation=tf.nn.elu,
+                                     kernel_initializer=tf.initializers.glorot_uniform()),
+                                     name='enc_conv1')
+            self._log_shape(conv1)
+
+            # the Example VAE specifies the activation functions as part of the layer
+            # we specify the activation function as a seperate tensor
+            # it is unknown if this is the preferred method in Tensorflow, but we know
+            # it works from work in the 3D-VAE-GAN notebook
+            # we also take advantage of batch_normalization
+            # more info here:
+            # https://medium.com/@ilango100/batch-normalization-speed-up-neural-network-training-245e39a62f85
+            # with the hope that it gives speed without sacrificing quality
+            # tf batch norm: https://www.tensorflow.org/api_docs/python/tf/layers/batch_normalization
+            # tf elu (exponential linear unit): https://www.tensorflow.org/api_docs/python/tf/nn/elu
+
+            conv2 = tf.layers.batch_normalization(tf.layers.conv3d(conv1,
+                                     filters=16,
+                                     kernel_size=[3, 3, 3],
+                                     strides=(2, 2, 2),
+                                     padding='same',
+                                     activation=tf.nn.elu,
+                                     kernel_initializer=tf.initializers.glorot_uniform()))
+            self._log_shape(conv2)
+
+            conv3 = tf.layers.batch_normalization(tf.layers.conv3d(conv2,
+                                     filters=32,
+                                     kernel_size=[3, 3, 3],
+                                     strides=(1, 1, 1),
+                                     padding='valid',
+                                     activation=tf.nn.elu,
+                                     kernel_initializer=tf.initializers.glorot_uniform()))
+            self._log_shape(conv3)
+
+            conv4 = tf.layers.batch_normalization(tf.layers.conv3d(conv3,
+                                     filters=64,
+                                     kernel_size=[3, 3, 3],
+                                     strides=(2, 2, 2),
+                                     padding='same',
+                                     activation=tf.nn.elu,
+                                     kernel_initializer=tf.initializers.glorot_uniform()))
+            self._log_shape(conv4)
+
+            # Apply one fully-connected layer after Conv3d layers
+            # tf dense layer: https://www.tensorflow.org/api_docs/python/tf/layers/dense
+            dense1 = tf.layers.batch_normalization(tf.layers.dense(conv4,
+                                 units=343,
                                  activation=tf.nn.elu,
                                  kernel_initializer=tf.initializers.glorot_uniform()))
-        self._log_shape(conv1)
+            self._log_shape(dense1)
 
-        # the Example VAE specifies the activation functions as part of the layer
-        # we specify the activation function as a seperate tensor
-        # it is unknown if this is the preferred method in Tensorflow, but we know
-        # it works from work in the 3D-VAE-GAN notebook
-        # we also take advantage of batch_normalization
-        # more info here:
-        # https://medium.com/@ilango100/batch-normalization-speed-up-neural-network-training-245e39a62f85
-        # with the hope that it gives speed without sacrificing quality
-        # tf batch norm: https://www.tensorflow.org/api_docs/python/tf/layers/batch_normalization
-        # tf elu (exponential linear unit): https://www.tensorflow.org/api_docs/python/tf/nn/elu
+            # Apply dropout
+            flatten = tf.layers.flatten(tf.nn.dropout(dense1, keep_prob))
 
-        conv2 = tf.layers.batch_normalization(tf.layers.conv3d(conv1,
-                                 filters=16,
-                                 kernel_size=[3, 3, 3],
-                                 strides=(2, 2, 2),
-                                 padding='same',
-                                 activation=tf.nn.elu,
-                                 kernel_initializer=tf.initializers.glorot_uniform()))
-        self._log_shape(conv2)
+            # Calculate outputs
+            enc_mu = tf.layers.batch_normalization(tf.layers.dense(flatten,
+                                 units=self.latent_dim,
+                                 activation=None))
+            self._log_shape(enc_mu)
+            enc_sig = tf.layers.batch_normalization(tf.layers.dense(flatten,
+                                 units=self.latent_dim,
+                                 activation=None))
+            self._log_shape(enc_sig)
 
-        conv3 = tf.layers.batch_normalization(tf.layers.conv3d(conv2,
-                                 filters=32,
-                                 kernel_size=[3, 3, 3],
-                                 strides=(1, 1, 1),
-                                 padding='valid',
-                                 activation=tf.nn.elu,
-                                 kernel_initializer=tf.initializers.glorot_uniform()))
-        self._log_shape(conv3)
-
-        conv4 = tf.layers.batch_normalization(tf.layers.conv3d(conv3,
-                                 filters=64,
-                                 kernel_size=[3, 3, 3],
-                                 strides=(2, 2, 2),
-                                 padding='same',
-                                 activation=tf.nn.elu,
-                                 kernel_initializer=tf.initializers.glorot_uniform()))
-        self._log_shape(conv4)
-
-        # Apply one fully-connected layer after Conv3d layers
-        # tf dense layer: https://www.tensorflow.org/api_docs/python/tf/layers/dense
-        dense1 = tf.layers.batch_normalization(tf.layers.dense(conv4,
-                             units=343,
-                             activation=tf.nn.elu,
-                             kernel_initializer=tf.initializers.glorot_uniform()))
-        self._log_shape(dense1)
-
-        # Apply dropout
-        flatten = tf.layers.flatten(tf.nn.dropout(dense1, keep_prob))
-
-        # Calculate outputs
-        enc_mu = tf.layers.batch_normalization(tf.layers.dense(flatten,
-                             units=self.latent_dim,
-                             activation=None))
-        self._log_shape(enc_mu)
-        enc_sig = tf.layers.batch_normalization(tf.layers.dense(flatten,
-                             units=self.latent_dim,
-                             activation=None))
-        self._log_shape(enc_sig)
-
-        # epsilon is a random draw from the latent space
-        epsilon = tf.random_normal(tf.stack([tf.shape(dense1)[0], self.latent_dim]))
-        self._log_shape(epsilon, 'epsilon')
-        enc_z = enc_mu + tf.multiply(epsilon, tf.exp(enc_sig))
-        self._log_shape(enc_z, 'z')
+            # epsilon is a random draw from the latent space
+            epsilon = tf.random_normal(tf.stack([tf.shape(dense1)[0], self.latent_dim]))
+            self._log_shape(epsilon, 'epsilon')
+            enc_z = enc_mu + tf.multiply(epsilon, tf.exp(enc_sig))
+            self._log_shape(enc_z, 'z')
 
         return enc_z, enc_mu, enc_sig
 
     def _make_decoder(self, input_z, trainable):
         
-        # There is some magic in the Example VAE that adds conditional input based on the
-        # class of the image. We do not have that luxury as we are attempting to do this
-        # with input that lacks classes.
-        # TODO: if poor results, try classes
-        self._log_shape(input_z, 'input_z')
+        with tf.variable_scope('decoder', reuse=tf.AUTO_REUSE):
 
-        # Why conv3d_transpose instead of conv3d?
-        #
-        # from https://www.tensorflow.org/api_docs/python/tf/nn/conv3d_transpose,
-        #     "This operation is sometimes called "deconvolution" after Deconvolutional Networks,
-        #      but is actually the transpose (gradient) of conv3d rather than an actual deconvolution."
-        #
-        # conv3d_transpose: https://www.tensorflow.org/api_docs/python/tf/layers/conv3d_transpose
-        dense1 = tf.layers.dense(input_z,
-                                 units=343,
-                                 kernel_initializer=tf.initializers.glorot_uniform(),
-                                 name='dec_dense1')
-        self._log_shape(dense1)
-        lrelu1 = tf.nn.elu(tf.layers.batch_normalization(dense1, training=trainable))
-        self._log_shape(lrelu1)
+            # There is some magic in the Example VAE that adds conditional input based on the
+            # class of the image. We do not have that luxury as we are attempting to do this
+            # with input that lacks classes.
+            # TODO: if poor results, try classes
+            self._log_shape(input_z, 'input_z')
 
-        #z = tf.reshape(z, (-1, 1, 1, 1, n_latent))
-        reshape_z = tf.reshape(lrelu1, shape=(-1, 7, 7, 7, 1), name='reshape_z')
-        self._log_shape(reshape_z)
+            # Why conv3d_transpose instead of conv3d?
+            #
+            # from https://www.tensorflow.org/api_docs/python/tf/nn/conv3d_transpose,
+            #     "This operation is sometimes called "deconvolution" after Deconvolutional Networks,
+            #      but is actually the transpose (gradient) of conv3d rather than an actual deconvolution."
+            #
+            # conv3d_transpose: https://www.tensorflow.org/api_docs/python/tf/layers/conv3d_transpose
+            dense1 = tf.layers.dense(input_z,
+                                     units=343,
+                                     kernel_initializer=tf.initializers.glorot_uniform(),
+                                     name='dec_dense1')
+            self._log_shape(dense1)
+            lrelu1 = tf.nn.elu(tf.layers.batch_normalization(dense1, training=trainable))
+            self._log_shape(lrelu1)
 
-        conv1 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(reshape_z,
-                                           filters=64,
-                                           kernel_size=[3, 3, 3],
-                                           strides=(1, 1, 1),
-                                           padding='same',
-                                           activation=tf.nn.elu,
-                                           # Example VAE does not mention bias
-                                           use_bias=False,
-                                           kernel_initializer=tf.initializers.glorot_uniform(),
-                                           name='dec_conv1'))
-        self._log_shape(conv1)
-        
-        conv2 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv1,
-                                           filters=32,
-                                           kernel_size=[3, 3, 3],
-                                           # Example VAE used .5 stride values, but Tensorflow complains
-                                           # of being forced to use a float value here
-                                           #strides=(1.0 / 2, 1.0 / 2, 1.0 / 2),
-                                           strides=(2, 2, 2),
-                                           padding='valid',
-                                           activation=tf.nn.elu,
-                                           use_bias=False,
-                                           kernel_initializer=tf.initializers.glorot_uniform(),
-                                           name='dec_conv2'))
-        self._log_shape(conv2)
+            #z = tf.reshape(z, (-1, 1, 1, 1, n_latent))
+            reshape_z = tf.reshape(lrelu1, shape=(-1, 7, 7, 7, 1), name='reshape_z')
+            self._log_shape(reshape_z)
 
-        conv3 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv2,
-                                           filters=16,
-                                           kernel_size=[3, 3, 3],
-                                           strides=(1, 1, 1),
-                                           # changed to valid to hit correct dimension
-                                           padding='same',
-                                           activation=tf.nn.elu,
-                                           use_bias=False,
-                                           kernel_initializer=tf.initializers.glorot_uniform(),
-                                           name='dec_conv3'))
-        self._log_shape(conv3)
+            conv1 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(reshape_z,
+                                               filters=64,
+                                               kernel_size=[3, 3, 3],
+                                               strides=(1, 1, 1),
+                                               padding='same',
+                                               activation=tf.nn.elu,
+                                               # Example VAE does not mention bias
+                                               use_bias=False,
+                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               name='dec_conv1'))
+            self._log_shape(conv1)
 
-        conv4 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv3,
-                                           filters=8,
-                                           kernel_size=[4, 4, 4],
-                                           #strides=(1.0 / 2, 1.0 / 2, 1.0 / 2),
-                                           strides=(2, 2, 2),
-                                           padding='valid',
-                                           activation=tf.nn.elu,
-                                           use_bias=False,
-                                           kernel_initializer=tf.initializers.glorot_uniform(),
-                                           name='dec_conv4'))
-        self._log_shape(conv4)
+            conv2 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv1,
+                                               filters=32,
+                                               kernel_size=[3, 3, 3],
+                                               # Example VAE used .5 stride values, but Tensorflow complains
+                                               # of being forced to use a float value here
+                                               #strides=(1.0 / 2, 1.0 / 2, 1.0 / 2),
+                                               strides=(2, 2, 2),
+                                               padding='valid',
+                                               activation=tf.nn.elu,
+                                               use_bias=False,
+                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               name='dec_conv2'))
+            self._log_shape(conv2)
 
-        conv5 = tf.layers.conv3d_transpose(conv4,
-                                           filters=1,
-                                           kernel_size=[3, 3, 3],
-                                           strides=(1, 1, 1),
-                                           padding='same',
-                                           use_bias=False,
-                                           kernel_initializer=tf.initializers.glorot_uniform(),
-                                           name='dec_conv5')
-        self._log_shape(conv5)
+            conv3 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv2,
+                                               filters=16,
+                                               kernel_size=[3, 3, 3],
+                                               strides=(1, 1, 1),
+                                               # changed to valid to hit correct dimension
+                                               padding='same',
+                                               activation=tf.nn.elu,
+                                               use_bias=False,
+                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               name='dec_conv3'))
+            self._log_shape(conv3)
 
-        #decoded_output = tf.nn.tanh(conv5)
-        decoded_output = tf.nn.sigmoid(conv5)
-        #decoded_output = tf.clip_by_value(decoded_output, 1e-7, 1.0 - 1e-7)
-        #self._add_debug_op('max decoded_output', tf.math.reduce_max(decoded_output), False)
-        #self._add_debug_op('min decoded_output', tf.math.reduce_min(decoded_output), False)
-        #self._add_debug_op('mean decoded_output', tf.math.reduce_mean(decoded_output), False)
-        #decoded_output = conv5
-        self._log_shape(decoded_output)
+            conv4 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv3,
+                                               filters=8,
+                                               kernel_size=[4, 4, 4],
+                                               #strides=(1.0 / 2, 1.0 / 2, 1.0 / 2),
+                                               strides=(2, 2, 2),
+                                               padding='valid',
+                                               activation=tf.nn.elu,
+                                               use_bias=False,
+                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               name='dec_conv4'))
+            self._log_shape(conv4)
+
+            conv5 = tf.layers.conv3d_transpose(conv4,
+                                               filters=1,
+                                               kernel_size=[3, 3, 3],
+                                               strides=(1, 1, 1),
+                                               padding='same',
+                                               use_bias=False,
+                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               name='dec_conv5')
+            self._log_shape(conv5)
+
+            #decoded_output = tf.nn.tanh(conv5)
+            decoded_output = tf.nn.sigmoid(conv5)
+            #decoded_output = tf.clip_by_value(decoded_output, 1e-7, 1.0 - 1e-7)
+            #self._add_debug_op('max decoded_output', tf.math.reduce_max(decoded_output), False)
+            #self._add_debug_op('min decoded_output', tf.math.reduce_min(decoded_output), False)
+            #self._add_debug_op('mean decoded_output', tf.math.reduce_mean(decoded_output), False)
+            self._log_shape(decoded_output)
 
         return decoded_output
     
     def _discriminator(self, input_x, trainable):
 
-        # need to clip the values?
-        self._log_shape(input_x, 'input_x')
+        with tf.variable_scope('discriminator', reuse=tf.AUTO_REUSE):
 
-        # 1st hidden layer
-        conv1 = tf.layers.conv3d(input_x, 128, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
-                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
-        lrelu1 = tf.nn.elu(conv1)
-        self._log_shape(lrelu1)
-        # 2nd hidden layer
-        conv2 = tf.layers.conv3d(lrelu1, 256, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
-                                kernel_initializer=tf.contrib.layers.xavier_initializer())
-        lrelu2 = tf.nn.elu(tf.layers.batch_normalization(conv2, training=trainable))
-        self._log_shape(lrelu2)
-        # 3rd hidden layer
-        conv3 = tf.layers.conv3d(lrelu2, 512, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
-                                kernel_initializer=tf.contrib.layers.xavier_initializer())
-        lrelu3 = tf.nn.elu(tf.layers.batch_normalization(conv3, training=trainable))
-        self._log_shape(lrelu3)
-        # output layer
-        #conv4 = tf.layers.conv3d(lrelu3, 1, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
-        #                          kernel_initializer=tf.contrib.layers.xavier_initializer())
-        conv4 = tf.layers.conv3d(lrelu3, 1, [3, 3, 3], strides=(1, 1, 1), padding='valid', use_bias=False,
-                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
-        o = tf.nn.sigmoid(conv4)
-        self._log_shape(conv4)
-        self._log_shape(o)
-            
+            # need to clip the values?
+            self._log_shape(input_x, 'input_x')
+
+            # 1st hidden layer
+            conv1 = tf.layers.conv3d(input_x, 128, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
+                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
+            lrelu1 = tf.nn.elu(conv1)
+            self._log_shape(lrelu1)
+            # 2nd hidden layer
+            conv2 = tf.layers.conv3d(lrelu1, 256, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
+                                    kernel_initializer=tf.contrib.layers.xavier_initializer())
+            lrelu2 = tf.nn.elu(tf.layers.batch_normalization(conv2, training=trainable))
+            self._log_shape(lrelu2)
+            # 3rd hidden layer
+            conv3 = tf.layers.conv3d(lrelu2, 512, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
+                                    kernel_initializer=tf.contrib.layers.xavier_initializer())
+            lrelu3 = tf.nn.elu(tf.layers.batch_normalization(conv3, training=trainable))
+            self._log_shape(lrelu3)
+            # output layer
+            #conv4 = tf.layers.conv3d(lrelu3, 1, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
+            #                          kernel_initializer=tf.contrib.layers.xavier_initializer())
+            conv4 = tf.layers.conv3d(lrelu3, 1, [3, 3, 3], strides=(1, 1, 1), padding='valid', use_bias=False,
+                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
+            o = tf.nn.sigmoid(conv4)
+            self._log_shape(conv4)
+            self._log_shape(o)
+
         return o, conv4
     
     def _make_loss(self, enc_input, dec_output, z_mu, z_sig):
@@ -347,6 +353,11 @@ class VoxelVaegan():
         return loss, optimizer, mean_recon, mean_kl
 
     def _make_GAN_loss(self, D_real_logits, D_fake_logits):
+        """
+        From https://github.com/zhangqianhui/vae-gan-tensorflow/blob/master/vaegan.py
+        
+        sigmoid_cross_entropy
+        """
 
         D_loss_real = tf.reduce_mean(D_real_logits)
         D_loss_fake = tf.reduce_mean(D_fake_logits)
@@ -383,9 +394,6 @@ class VoxelVaegan():
                     logging.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch_num, batch_num, (time.time() - start) / 60))
                 # repeat for extra practice on each shape
                 for _ in range(input_repeats):
-
-                    #ops = tuple([self.optimizer, self.loss, self.mean_kl, self.mean_recon] + 
-                    #            [op for name, op, _ in self._debug_ops])
                     
                     ops = tuple([self.optimizer, self.loss, self.mean_kl, self.mean_recon
                                  , self.D_loss, self.G_loss, self.D_optim, self.G_optim] + 
@@ -396,7 +404,7 @@ class VoxelVaegan():
                         feed_dict={self._input_x: batch, self._keep_prob:self.keep_prob, self._trainable: True}
                     )
                     _, loss, kl_divergence, recon_loss, D_loss, G_loss, _, _ = results[:8]
-                    self._log_debug_ops(results[4:])
+                    self._log_debug_ops(results[8:])
                 
                 if self.verbose:
                     #print('\tKL Divergence = {:.5f}, Reconstruction Loss = {:.5f}'.format(kl_divergence, recon_loss))
