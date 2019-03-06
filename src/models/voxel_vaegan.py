@@ -269,6 +269,9 @@ class VoxelVaegan():
         return decoded_output
     
     def _discriminator(self, input_x, trainable):
+        """
+        Thank you: https://github.com/Spartey/3D-VAE-GAN-Deep-Learning-Project/blob/master/3D-VAE-WGAN/model.py
+        """
 
         with tf.variable_scope('discriminator', reuse=tf.AUTO_REUSE):
 
@@ -276,24 +279,24 @@ class VoxelVaegan():
             self._log_shape(input_x, 'input_x')
 
             # 1st hidden layer
-            conv1 = tf.layers.conv3d(input_x, 128, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
+            conv1 = tf.layers.conv3d(input_x, 128, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
             lrelu1 = tf.nn.elu(conv1)
             self._log_shape(lrelu1)
             # 2nd hidden layer
-            conv2 = tf.layers.conv3d(lrelu1, 256, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
+            conv2 = tf.layers.conv3d(lrelu1, 256, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
             lrelu2 = tf.nn.elu(tf.layers.batch_normalization(conv2, training=trainable))
             self._log_shape(lrelu2)
             # 3rd hidden layer
-            conv3 = tf.layers.conv3d(lrelu2, 512, [3, 3, 3], strides=(2, 2, 2), padding='same', use_bias=False,
+            conv3 = tf.layers.conv3d(lrelu2, 512, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
             lrelu3 = tf.nn.elu(tf.layers.batch_normalization(conv3, training=trainable))
             self._log_shape(lrelu3)
             # output layer
             #conv4 = tf.layers.conv3d(lrelu3, 1, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
             #                          kernel_initializer=tf.contrib.layers.xavier_initializer())
-            conv4 = tf.layers.conv3d(lrelu3, 1, [3, 3, 3], strides=(1, 1, 1), padding='valid', use_bias=False,
+            conv4 = tf.layers.conv3d(lrelu3, 1, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
             o = tf.nn.sigmoid(conv4)
             self._log_shape(conv4)
