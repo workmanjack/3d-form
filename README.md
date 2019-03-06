@@ -8,9 +8,9 @@ Running Experiments
 
 We make use of the sacred python package ([github](https://github.com/IDSIA/sacred), [docs](https://sacred.readthedocs.io/en/latest/index.html)) to manage our experimments.
 
-Experiments are controlled via a json config file. You can view an example at src/configs/config1.json.
+Experiments are controlled via a json config file. You can view an example at src/configs/voxel_vaegan/config1.json.
 
-Experiments are launched with `python train_vae.py with configs/config1.json`. This will execute the script with the settings inside config1.json and store all outputs in a numbered directory of src/experiments.
+Experiments are launched with `python train_vaegan.py with configs/voxel_vaegan/config1.json`. This will execute the script with the settings inside config1.json and store all outputs in a numbered directory of src/experiments.
 
 Getting Started
 ------------
