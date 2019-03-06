@@ -1,0 +1,24 @@
+{
+    "cfg": {
+        "dataset": {
+            "index": "../data/processed/thingi10k_index_10.csv"
+        },
+        "model": {
+            "voxels_dim": 32,
+            "batch_size": 10,
+            "voxel_prob_threshold": 0.065,
+            "learning_rate": 0.0001,
+            "keep_prob": 1.0,
+            "kl_div_loss_weight": 1,
+            "recon_loss_weight": 10000,            
+            "latent_dim": 100,
+            "verbose": true,
+            "debug": true,
+            "generator_verbose": false,
+            "epochs": 10,
+            "input_repeats": 1,
+            "display_step": 10,
+            "save_step": 10
+        }
+    }
+}

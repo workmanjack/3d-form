@@ -6,7 +6,7 @@ data/processed/Thingi10k/voxels/*
 notebooks/_output/*
 notebooks/MNIST_data
 src/logs
-src/experiments
+src/experiments*
 __pycache__
 *.sublime-project
 *.sublime-workspace
