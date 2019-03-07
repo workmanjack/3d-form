@@ -26,9 +26,8 @@ ex = Experiment(name='voxel_vaegan')
 ex.observers.append(FileStorageObserver.create('experiments_vaegan'))
 
 
-@ex.automain
-def main(cfg):
-
+def train_vaegan(cfg):
+    
     get_logger()
     logging.info('Starting train_vaegan main')
     
@@ -72,7 +71,9 @@ def main(cfg):
     try:
         vaegan = VoxelVaegan(input_dim=VOXELS_DIM,
                           latent_dim=cfg_model.get('latent_dim'),
-                          learning_rate=cfg_model.get('learning_rate'),
+                          enc_lr=cfg_model.get('enc_lr'),
+                          dec_lr=cfg_model.get('dec_lr'),
+                          dis_lr=cfg_model.get('dis_lr'),
                           keep_prob=cfg_model.get('keep_prob'),
                           kl_div_loss_weight=cfg_model.get('kl_div_loss_weight'),
                           recon_loss_weight=cfg_model.get('recon_loss_weight'),
@@ -89,8 +90,13 @@ def main(cfg):
                      display_step=cfg_model.get('display_step'),
                      save_step=cfg_model.get('save_step'))
         
-        ex.info['metrics'] = vaegan.metrics
-        ex.info['model_dir'] = vaegan.ckpt_dir
+        try:
+            ex.info['metrics'] = vaegan.metrics
+            ex.info['model_dir'] = vaegan.ckpt_dir
+        except:
+            # fails if not running in an experiment... which is okay
+            print('Did not save experiment metrics')
+            pass
 
     except Exception as exc:
         logging.exception('Failed to train vae')
@@ -99,18 +105,25 @@ def main(cfg):
         
     ### Test Model
     
-    #vox_data = thingi.get_voxels(
-    #    VOXELS_DIM,
-    #    stl_file=stl_example,
-    #    shape=[-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1])
-    #recon = vae.reconstruct(vox_data)
-    #recon = np.reshape(recon, [VOXELS_DIM, VOXELS_DIM, VOXELS_DIM])
-    #recon = recon > cfg_voxel_vae.get('voxel_prob_threshold')
-    #plot_voxels(recon)
+    if example_stl_id:
+        vox_data = thingi.get_voxels(
+            VOXELS_DIM,
+            stl_file=stl_example,
+            shape=[-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1])
+        recon = vaegan.reconstruct(vox_data)
+        recon = np.reshape(recon, [VOXELS_DIM, VOXELS_DIM, VOXELS_DIM])
+        recon = recon > cfg_model.get('voxel_prob_threshold')
+        plot_voxels(recon)
 
     logging.info('Done train_vaegan.py main')
 
     return
+
+
+@ex.automain
+def main(cfg):
+
+    train_vaegan(cfg)
 
 
 #if __name__ == '__main__':
