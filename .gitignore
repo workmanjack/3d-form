@@ -5,6 +5,7 @@ data/raw/*
 data/processed/Thingi10k/voxels/*
 notebooks/_output/*
 notebooks/MNIST_data
+notebooks/experiments*
 src/logs
 src/experiments*
 __pycache__
