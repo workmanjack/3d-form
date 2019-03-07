@@ -328,6 +328,8 @@ class VoxelVaegan():
         # thank you: https://stackoverflow.com/questions/36533723/tensorflow-get-all-variables-in-scope
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
         dis_optim = tf.train.RMSPropOptimizer(dis_lr).minimize(-dis_loss, var_list=var_list)
+        tf.summary.scalar('dis_loss_real', dis_loss_real)
+        tf.summary.scalar('dis_loss_fake', dis_loss_fake)
         return dis_loss, dis_optim
     
     def _make_encoder_loss(self, enc_input, dec_output, z_mu, z_sig, enc_lr):
@@ -380,6 +382,8 @@ class VoxelVaegan():
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
         optimizer = tf.train.AdamOptimizer(learning_rate=enc_lr).minimize(loss, var_list=var_list)
 
+        tf.summary.scalar("mean_kl", mean_kl) 
+        tf.summary.scalar("mean_recon", recon_loss) 
         tf.summary.scalar("enc_loss", loss) 
         
         return loss, optimizer, mean_recon, mean_kl

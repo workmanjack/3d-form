@@ -35,6 +35,7 @@ def get_logger(logname='root', verbosity=1):
         'handlers': {
             'console': {
                 'class': 'logging.StreamHandler',
+                'stream': 'ext://sys.stdout'
                 #'formatter': 'detailed',
                 #'level': 'INFO',
             },
