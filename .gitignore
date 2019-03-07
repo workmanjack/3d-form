@@ -16,6 +16,7 @@ notebooks/cynthia/*
 models/stl_rnn
 models/stl_vae
 models/voxel_vae
+models/voxel_vaegan
 # data for tf tutorial of style transfer
 notebooks/vgg16/*
 
