@@ -18,6 +18,7 @@ models/stl_rnn
 models/stl_vae
 models/voxel_vae
 models/voxel_vaegan
+models/voxel_vaegan1
 # data for tf tutorial of style transfer
 notebooks/vgg16/*
 

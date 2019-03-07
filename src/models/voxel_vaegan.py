@@ -7,6 +7,7 @@ from collections import defaultdict
 import tensorflow as tf
 import logging.config
 import numpy as np
+import json
 import time
 import os
 
@@ -23,7 +24,7 @@ class VoxelVaegan():
     SCOPE_DISCRIMINATOR = 'discriminator'
     
     def __init__(self, input_dim, latent_dim, enc_lr, dec_lr, dis_lr, keep_prob, verbose=False, 
-                 kl_div_loss_weight=5, recon_loss_weight=5e-4, debug=False, ckpt_dir='voxel_vaegan'):
+                 kl_div_loss_weight=5, recon_loss_weight=5e-4, debug=False, ckpt_dir='voxel_vaegan', tb_dir='tb'):
         """
         Args:
             input_dim: int, dimension of voxels to process
@@ -74,6 +75,8 @@ class VoxelVaegan():
         
         # Setup Model Saving
         self.ckpt_dir = os.path.join(MODEL_DIR, ckpt_dir)
+        self.tb_dir = os.path.join(self.ckpt_dir, tb_dir)
+        os.makedirs(tb_dir, exist_ok=True)
         self.saver = tf.train.Saver()
         self.recons_pre = list()
         self.recons_post = list()
@@ -315,6 +318,7 @@ class VoxelVaegan():
         dec_loss = -tf.reduce_mean(dis_fake_logits)
         var_list = self._get_vars_by_scope(self.SCOPE_DECODER)
         dec_optim = tf.train.RMSPropOptimizer(dec_lr).minimize(dec_loss, var_list=var_list)
+        tf.summary.scalar("dec_loss", dec_loss) 
         return dec_loss, dec_optim
     
     def _make_discriminator_loss(self, dis_real_logits, dis_fake_logits, dis_lr):
@@ -376,6 +380,8 @@ class VoxelVaegan():
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
         optimizer = tf.train.AdamOptimizer(learning_rate=enc_lr).minimize(loss, var_list=var_list)
 
+        tf.summary.scalar("enc_loss", loss) 
+        
         return loss, optimizer, mean_recon, mean_kl
 
     def _add_debug_op(self, name, op, newline=True):
@@ -395,6 +401,10 @@ class VoxelVaegan():
     def train(self, generator, epochs=10, input_repeats=1, display_step=1, save_step=1, viz_data=None):
         
         start = time.time()
+        
+        train_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'train'), self.sess.graph)
+        counter = 0
+
         for epoch_num, epoch in enumerate(range(epochs)):
 
             for batch_num, batch in enumerate(generator()):
@@ -404,7 +414,9 @@ class VoxelVaegan():
                 # repeat for extra practice on each shape
                 for _ in range(input_repeats):
                     
-                    ops = tuple([self.enc_optim, self.enc_loss, self.mean_kl, self.mean_recon
+                    merge = tf.summary.merge_all()
+                    
+                    ops = tuple([merge, self.enc_optim, self.enc_loss, self.mean_kl, self.mean_recon
                                  , self.dis_loss, self.dec_loss, self.dis_optim, self.dec_optim] + 
                                 [op for name, op, _ in self._debug_ops])
 
@@ -412,8 +424,11 @@ class VoxelVaegan():
                         ops,
                         feed_dict={self._input_x: batch, self._keep_prob:self.keep_prob, self._trainable: True}
                     )
-                    _, loss, kl_divergence, recon_loss, dis_loss, dec_loss, _, _ = results[:8]
-                    self._log_debug_ops(results[8:])
+                    summary, _, loss, kl_divergence, recon_loss, dis_loss, dec_loss, _, _ = results[:9]
+                    self._log_debug_ops(results[9:])
+                    
+                    train_writer.add_summary(summary, counter)
+                    counter += 1
                 
                 if self.verbose:
                     logging.debug('\tKL Divergence = {}, Reconstruction Loss = {}, -dis_loss = {}, dec_loss = {}'.format(
@@ -422,10 +437,10 @@ class VoxelVaegan():
             elapsed_time = (time.time() - start) / 60
             # save the epoch's data for review later
             self.metrics['epoch' + str(epoch)] = {
-                'loss': loss,
-                'kl_divergence': kl_divergence,
-                'reconstruction_loss': recon_loss,
-                'elapsed_time': elapsed_time 
+                'loss': float(loss),
+                'kl_divergence': float(kl_divergence),
+                'reconstruction_loss': float(recon_loss),
+                'elapsed_time': float(elapsed_time) 
             }
 
             if (epoch + 1) % display_step == 0:
@@ -471,6 +486,10 @@ class VoxelVaegan():
                 # Save the variables to disk.
                 save_path = self.saver.save(self.sess, os.path.join(self.ckpt_dir, "model_epoch-{}.ckpt".format(epoch)))
                 logging.info("Model saved in path: {}".format(save_path))
+                metrics_json = os.path.join(self.ckpt_dir, "metrics.json")
+                with open(metrics_json, 'w') as fp:
+                    json.dump(self.metrics, fp)
+                logging.info("Metrics saved in path: {}".format(metrics_json))
                                        
         return
 

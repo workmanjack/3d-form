@@ -9,8 +9,9 @@ from data.voxels import plot_voxels
 from sacred.observers import FileStorageObserver
 from sacred import Experiment
 import tensorflow as tf
-import numpy as np
 import logging.config
+import numpy as np
+import subprocess
 import json
 import sys
 import os
@@ -78,11 +79,18 @@ def train_vaegan(cfg):
                           kl_div_loss_weight=cfg_model.get('kl_div_loss_weight'),
                           recon_loss_weight=cfg_model.get('recon_loss_weight'),
                           verbose=cfg_model.get('verbose'),
-                          debug=cfg_model.get('debug'))
+                          debug=cfg_model.get('debug'),
+                          ckpt_dir=cfg_model.get('ckpt_dir'),
+                          tb_dir=cfg_model.get('tb_dir'))
 
         generator = lambda: thingi.voxels_batchmaker(batch_size=BATCH_SIZE,
                                                      voxels_dim=VOXELS_DIM,
                                                      verbose=cfg_model.get('generator_verbose'))
+        
+        if cfg_model.get('launch_tensorboard', False):
+            tb_cmd = ['tensorboard', '--logdir', vaegan.tb_dir]
+            logging.info(tb_cmd)
+            tb_proc = subprocess.Popen(tb_cmd)
 
         vaegan.train(generator,
                      epochs=cfg_model.get('epochs'),
