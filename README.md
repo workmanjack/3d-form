@@ -12,6 +12,17 @@ Experiments are controlled via a json config file. You can view an example at sr
 
 Experiments are launched with `python train_vaegan.py with configs/voxel_vaegan/config1.json`. This will execute the script with the settings inside config1.json and store all outputs in a numbered directory of src/experiments.
 
+*From A Notebook*
+
+Experiments with the Voxel VAE-GAN can also be run within a notebook. Checkout notebooks/train_vaegan.ipynb. This notebook also incorporates sacred to track your experiments.
+
+*Tensorboard*
+
+The train_vaegan script and notebook support tensorboard with the proper config file settings. Tensorboard can be found at localhost:6006 or the 6006 port of whatever IP address your server is running on.
+
+If tensorboard stops working and begins printing an error of "6006 already in use", try running this command in a terminal: top | grep tensorboard. If it returns a process, try "kill <pid>" where pid is the first number in the returned grep command.
+
+
 Getting Started
 ------------
 

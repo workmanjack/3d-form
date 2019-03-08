@@ -70,18 +70,7 @@ def train_vaegan(cfg):
     tf.reset_default_graph()
 
     try:
-        vaegan = VoxelVaegan(input_dim=VOXELS_DIM,
-                          latent_dim=cfg_model.get('latent_dim'),
-                          enc_lr=cfg_model.get('enc_lr'),
-                          dec_lr=cfg_model.get('dec_lr'),
-                          dis_lr=cfg_model.get('dis_lr'),
-                          keep_prob=cfg_model.get('keep_prob'),
-                          kl_div_loss_weight=cfg_model.get('kl_div_loss_weight'),
-                          recon_loss_weight=cfg_model.get('recon_loss_weight'),
-                          verbose=cfg_model.get('verbose'),
-                          debug=cfg_model.get('debug'),
-                          ckpt_dir=cfg_model.get('ckpt_dir'),
-                          tb_dir=cfg_model.get('tb_dir'))
+        vaegan = VoxelVaegan.initFromCfg(cfg)
 
         generator = lambda: thingi.voxels_batchmaker(batch_size=BATCH_SIZE,
                                                      voxels_dim=VOXELS_DIM,
@@ -90,7 +79,7 @@ def train_vaegan(cfg):
         if cfg_model.get('launch_tensorboard', False):
             tb_cmd = ['tensorboard', '--logdir', vaegan.tb_dir]
             logging.info(tb_cmd)
-            tb_proc = subprocess.Popen(tb_cmd)
+            tb_proc = subprocess.Popen(tb_cmd, stdout=subprocess.PIPE)
 
         vaegan.train(generator,
                      epochs=cfg_model.get('epochs'),

@@ -1,6 +1,7 @@
+import logging.config
+import subprocess
 import requests
 import datetime
-import logging.config
 import os
 
 
@@ -96,3 +97,15 @@ def read_json_data(path):
 
 def dataframe_pctile_slice(df, col, pctile):
     return df[df[col] < df[col].quantile(pctile)]
+
+
+def kill_tensorboard():
+    cmd = ['pgrep', 'tensorboard']
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, err = p.communicate()
+    rc = p.returncode
+    print('{} yielded -> {}'.format(cmd, output))
+    if output:
+        subprocess.run(['kill', str(int(output))])
+        print('killed!')
+    return

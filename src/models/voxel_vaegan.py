@@ -61,7 +61,7 @@ class VoxelVaegan():
         # Construct the TensorFlow Graph
         self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x, self._keep_prob, self._trainable)
         self.decoder = self._make_decoder(self.encoder, self._trainable)
-        
+
         self.dis_real, self.dis_real_logits = self._discriminator(self._input_x, self._trainable)
         self.dis_fake, self.dis_fake_logits = self._discriminator(self.decoder, self._trainable)
 
@@ -85,9 +85,26 @@ class VoxelVaegan():
         # Launch the session
         self.sess = tf.InteractiveSession()
         self.sess.run(init)
+
+    @classmethod
+    def initFromCfg(cls, cfg):
+        cfg_model = cfg.get('model')
+        vaegan = cls(input_dim=cfg_model.get('voxels_dim'),
+                     latent_dim=cfg_model.get('latent_dim'),
+                     enc_lr=cfg_model.get('enc_lr'),
+                     dec_lr=cfg_model.get('dec_lr'),
+                     dis_lr=cfg_model.get('dis_lr'),
+                     keep_prob=cfg_model.get('keep_prob'),
+                     kl_div_loss_weight=cfg_model.get('kl_div_loss_weight'),
+                     recon_loss_weight=cfg_model.get('recon_loss_weight'),
+                     verbose=cfg_model.get('verbose'),
+                     debug=cfg_model.get('debug'),
+                     ckpt_dir=cfg_model.get('ckpt_dir'),
+                     tb_dir=cfg_model.get('tb_dir'))
+        return vaegan
         
     def _log_shape(self, tensor, name=None):
-        if self.verbose:
+        if self.debug:
             if not name:
                 name = tensor.name
             logging.debug('{}: {}'.format(name, tensor.shape))
@@ -383,7 +400,7 @@ class VoxelVaegan():
         optimizer = tf.train.AdamOptimizer(learning_rate=enc_lr).minimize(loss, var_list=var_list)
 
         tf.summary.scalar("mean_kl", mean_kl) 
-        tf.summary.scalar("mean_recon", recon_loss) 
+        tf.summary.scalar("mean_recon", mean_recon) 
         tf.summary.scalar("enc_loss", loss) 
         
         return loss, optimizer, mean_recon, mean_kl
