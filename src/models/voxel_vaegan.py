@@ -419,99 +419,188 @@ class VoxelVaegan():
                 logging.debug(msg)
         return
 
-    def train(self, generator, epochs=10, input_repeats=1, display_step=1, save_step=1, viz_data=None):
+    def _model_step(self, feed_dict, step, summary_writer, summary_op, exec_ops, debug_ops):
+        """
+        Performs a single step of the model training process
+        
+        Writes summary_op result with summary_writer, prints debug_ops results, and returns
+        exec_ops results
+        
+        Args:
+            feed_dict: dict, model input tensorflow style
+            step: int, id of current step
+            summary_writer: tf summary writer for logging summary ops
+            summary_op: tf.tensor, summary op
+            exec_ops: list of tf.tensors, all tf tensors to execute and return
+            debug_ops: list of tf.tensors, debug ops
+            
+        Returns:
+            list, results of exec_ops
+        """
+        ops = tuple([summary_op] + exec_ops + debug_ops)
+        results = self.sess.run(ops, feed_dict=feed_dict)
+        summary = results[0]
+        exec_results = results[1:1 + len(exec_ops)]
+        debug_results = results[1 + len(exec_ops):]
+        
+        summary_writer.add_summary(summary, step)
+        self._log_debug_ops(debug_results)
+            
+        return exec_results
+    
+    def _log_model_step_results(self, enc_loss, kl, recon, dis_loss, dec_loss):
+        """
+        Helper function for logging results from _model_step func
+        
+        Note that there's probably a better way to do this (perhaps with a class
+        to represent all expected losses), but for now we use this function just to
+        avoid writing the same log logic for train/dev/test output
+        """
+        logging.info("Enc Loss = {:.5f}, ".format(enc_loss) + 
+                     "KL Divergence = {:.5f}, ".format(kl) +
+                     "Reconstruction Loss = {:.5f}, ".format(recon) +
+                     "-dis_Loss = {:.5f}, ".format(-dis_loss) +
+                     "dec_Loss = {:.5f}, ".format(dec_loss) +
+                     "Elapsed time: {:.2f} mins".format((time.time() - start) / 60))
+        return
+
+    def _save_model_step_results(self, epoch, enc_loss, kl, recon, dis_loss, dec_loss):
+        # save the epoch's data for review later
+        self.metrics['epoch' + str(epoch)] = {
+            'enc_loss': float(enc_loss),
+            'kl_divergence': float(kl),
+            'reconstruction_loss': float(recon),
+            'dis_loss': float(dis_loss),
+            'dec_loss': float(dec_loss),
+            'elapsed_time': float(elapsed_time) 
+        }
+        return
+    
+    def _train_recon_example(self, epoch, viz_data):
+        """
+        Generates a side-by-side reconstruction example during the training process
+        """
+        logging.info('Generation Example:')
+        self._log_shape(viz_data, 'Example shape (before reshape)')
+        recon_input = np.reshape(viz_data, (1, self.input_dim, self.input_dim, self.input_dim, 1))
+        self._log_shape(recon_input, 'Example shape')
+
+        # generate!
+        recon = self.reconstruct(recon_input)
+        self._log_shape(recon, 'Recon')
+
+        # prepare for plotting
+        recon_input = np.reshape(recon_input, (self.input_dim, self.input_dim, self.input_dim))
+        self._log_shape(recon_input, 'Example shape (for plotting)')
+        recon = np.reshape(recon, (self.input_dim, self.input_dim, self.input_dim))
+        self._log_shape(recon, 'Recon (for plotting)')
+        # network outputs decimals; here we force them to True/False for plotting
+        self.recons_pre.append(recon)
+        recon = recon > 0.5
+        self.recons_post.append(recon)
+        # replace all nans with zeros
+        #recon = np.nan_to_num(recon)
+
+        # save the generated object in case we wish to review later
+        path = os.path.join(self.ckpt_dir, 'recon_epoch-{}.npy'.format(epoch))
+
+        # visualize
+        self.visualize_reconstruction(recon_input, recon)
+
+        return
+
+    def _save_model_ckpt(self, epoch):
+        # Save the variables to disk.
+        save_path = self.saver.save(self.sess, os.path.join(self.ckpt_dir, "model_epoch-{}.ckpt".format(epoch)))
+        logging.info("Model saved in path: {}".format(save_path))
+        metrics_json = os.path.join(self.ckpt_dir, "metrics.json")
+        with open(metrics_json, 'w') as fp:
+            json.dump(self.metrics, fp)
+        logging.info("Metrics saved in path: {}".format(metrics_json))
+        return
+        
+    def train(self, train_generator, dev_generator=None, test_generator=None, epochs=10, input_repeats=1, display_step=1,
+              save_step=1, viz_data=None):
         
         start = time.time()
         
         train_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'train'), self.sess.graph)
+        dev_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'dev'), self.sess.graph)
+        test_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'test'), self.sess.graph)
+
         counter = 0
+        optim_ops = [self.enc_optim, self.dec_optim, self.dis_optim]
+        exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon, self.dis_loss, self.dec_loss]
+        debug_ops = [op for name, op, _ in self._debug_ops]
+        
+        ### Begin Training ###
 
-        for epoch_num, epoch in enumerate(range(epochs)):
+        for epoch in range(epochs):
 
-            for batch_num, batch in enumerate(generator()):
+            logging.info("Epoch: {}, ".format(epoch))
+            logging.info("Elapsed time: {:.2f} mins".format((time.time() - start) / 60))
+
+            ### Training Loop ###
+            for batch_num, batch in enumerate(train_generator()):
                 
                 if self.verbose:
-                    logging.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch_num, batch_num, (time.time() - start) / 60))
+                    logging.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch, batch_num, (time.time() - start) / 60))
+
                 # repeat for extra practice on each shape
                 for _ in range(input_repeats):
                     
                     merge = tf.summary.merge_all()
-                    
-                    ops = tuple([merge, self.enc_optim, self.enc_loss, self.mean_kl, self.mean_recon
-                                 , self.dis_loss, self.dec_loss, self.dis_optim, self.dec_optim] + 
-                                [op for name, op, _ in self._debug_ops])
-
-                    results = self.sess.run(
-                        ops,
-                        feed_dict={self._input_x: batch, self._keep_prob:self.keep_prob, self._trainable: True}
-                    )
-                    summary, _, loss, kl_divergence, recon_loss, dis_loss, dec_loss, _, _ = results[:9]
-                    self._log_debug_ops(results[9:])
-                    
-                    train_writer.add_summary(summary, counter)
+                    results = self._model_step(feed_dict={self._input_x: batch, self._keep_prob:self.keep_prob, self._trainable: True},
+                                               step=counter,
+                                               summary_writer=train_writer,
+                                               summary_op=merge,
+                                               optim_ops=optim_ops,
+                                               exec_ops=exec_ops,
+                                               debug_ops=debug_ops)
                     counter += 1
-                
-                if self.verbose:
-                    logging.debug('\tKL Divergence = {}, Reconstruction Loss = {}, -dis_loss = {}, dec_loss = {}'.format(
-                        kl_divergence, recon_loss, -dis_loss, dec_loss))
-
-            elapsed_time = (time.time() - start) / 60
-            # save the epoch's data for review later
-            self.metrics['epoch' + str(epoch)] = {
-                'loss': float(loss),
-                'kl_divergence': float(kl_divergence),
-                'reconstruction_loss': float(recon_loss),
-                'elapsed_time': float(elapsed_time) 
-            }
+                    enc_loss, kl, recon, dis_loss, dec_loss = results
+                    self._save_model_step_results(epoch, enc_loss, kl, recon, dis_loss, dec_loss, ((time.time() - start) / 60))
 
             if (epoch + 1) % display_step == 0:
-                print("Epoch: {}, ".format(epoch + 1) + 
-                      "Loss = {:.5f}, ".format(loss) + 
-                      "KL Divergence = {:.5f}, ".format(kl_divergence) +
-                      "Reconstruction Loss = {:.5f}, ".format(recon_loss) +
-                      "-dis_Loss = {:.5f}, ".format(-dis_loss) +
-                      "dec_Loss = {:.5f}, ".format(dec_loss) +
-                      "Elapsed time: {:.2f} mins".format((time.time() - start) / 60))
-                print('Generation Example:')
-                
-                # prepare for generation
+                self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss)
                 if viz_data is not None:
-                    logging.info('Generation Example:')
-                    self._log_shape(viz_data, 'Example shape (before reshape)')
-                    recon_input = np.reshape(viz_data, (1, self.input_dim, self.input_dim, self.input_dim, 1))
-                    self._log_shape(recon_input, 'Example shape')
+                    self._train_recon_example(epoch, viz_data)
 
-                    # generate!
-                    recon = self.reconstruct(recon_input)
-                    self._log_shape(recon, 'Recon')
+            ### Evaluate Dev Dataset ###
+            if dev_generator and (epoch + 1) % dev_step == 0:
+                logging.info('Evaluating Dev')
+                
+                for batch_num, batch in enumerate(dev_generator()):
+                    
+                    merge = tf.summary.merge_all()
+                    self._log_model_step_results(self._model_step(
+                       feed_dict={self._input_x: batch, self._keep_prob:1.0, self._trainable: False},
+                       step=counter,
+                       summary_writer=dev_writer,
+                       summary_op=merge,
+                       exec_ops=exec_ops))
 
-                    # prepare for plotting
-                    recon_input = np.reshape(recon_input, (self.input_dim, self.input_dim, self.input_dim))
-                    self._log_shape(recon_input, 'Example shape (for plotting)')
-                    recon = np.reshape(recon, (self.input_dim, self.input_dim, self.input_dim))
-                    self._log_shape(recon, 'Recon (for plotting)')
-                    # network outputs decimals; here we force them to True/False for plotting
-                    self.recons_pre.append(recon)
-                    recon = recon > 0.5
-                    self.recons_post.append(recon)
-                    # replace all nans with zeros
-                    #recon = np.nan_to_num(recon)
-
-                    # save the generated object in case we wish to review later
-                    path = os.path.join(self.ckpt_dir, 'recon_epoch-{}.npy'.format(epoch))
-
-                    # visualize
-                    self.visualize_reconstruction(recon_input, recon)
-
+            ### Save Model Checkpoint ###
             if (epoch + 1) % save_step == 0:
-                # Save the variables to disk.
-                save_path = self.saver.save(self.sess, os.path.join(self.ckpt_dir, "model_epoch-{}.ckpt".format(epoch)))
-                logging.info("Model saved in path: {}".format(save_path))
-                metrics_json = os.path.join(self.ckpt_dir, "metrics.json")
-                with open(metrics_json, 'w') as fp:
-                    json.dump(self.metrics, fp)
-                logging.info("Metrics saved in path: {}".format(metrics_json))
-                                       
+                self._save_model_ckpt(epoch)
+                
+        ### Evaluate Test Dataset ###
+        if test_generator:
+            logging.info('Evaluating Test')
+
+            for batch_num, batch in enumerate(test_generator()):
+
+                merge = tf.summary.merge_all()
+                self._log_model_step_results(self._model_step(
+                   feed_dict={self._input_x: batch, self._keep_prob:1.0, self._trainable: False},
+                   step=counter,
+                   summary_writer=test_writer,
+                   summary_op=merge,
+                   exec_ops=exec_ops))
+            
+        return
+    
+    def test(self, ):
         return
 
     def restore(self, model_ckpt):
