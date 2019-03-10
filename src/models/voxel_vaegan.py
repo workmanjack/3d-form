@@ -1,5 +1,6 @@
 # project imports
 from models import MODEL_DIR
+from utils import elapsed_time
 
 
 # python & package imports
@@ -419,7 +420,7 @@ class VoxelVaegan():
                 logging.debug(msg)
         return
 
-    def _log_model_step_results(self, enc_loss, kl, recon, dis_loss, dec_loss):
+    def _log_model_step_results(self, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time):
         """
         Helper function for logging results from _model_step func
         
@@ -432,10 +433,10 @@ class VoxelVaegan():
                      "Reconstruction Loss = {:.5f}, ".format(recon) +
                      "-dis_Loss = {:.5f}, ".format(-dis_loss) +
                      "dec_Loss = {:.5f}, ".format(dec_loss) +
-                     "Elapsed time: {:.2f} mins".format((time.time() - start) / 60))
+                     "Elapsed time: {:.2f} mins".format(elapsed_time))
         return
 
-    def _save_model_step_results(self, epoch, enc_loss, kl, recon, dis_loss, dec_loss):
+    def _save_model_step_results(self, epoch, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time):
         # save the epoch's data for review later
         self.metrics['epoch' + str(epoch)] = {
             'enc_loss': float(enc_loss),
@@ -490,7 +491,7 @@ class VoxelVaegan():
         logging.info("Metrics saved in path: {}".format(metrics_json))
         return
         
-    def _model_step(self, feed_dict, step, summary_writer, summary_op, exec_ops, debug_ops):
+    def _model_step(self, feed_dict, step, summary_writer, summary_op, optim_ops=None, exec_ops=None, debug_ops=None):
         """
         Performs a single step of the model training process
         
@@ -502,17 +503,26 @@ class VoxelVaegan():
             step: int, id of current step
             summary_writer: tf summary writer for logging summary ops
             summary_op: tf.tensor, summary op
+            optim_ops: list of tf.tensors, the tf optimizers
             exec_ops: list of tf.tensors, all tf tensors to execute and return
             debug_ops: list of tf.tensors, debug ops
             
         Returns:
             list, results of exec_ops
         """
-        ops = tuple([summary_op] + exec_ops + debug_ops)
+        # build ops list; allow for Nones
+        ops = [summary_op]
+        ops.extend([] if not optim_ops else optim_ops)
+        ops.extend([] if not exec_ops else exec_ops)
+        ops.extend([] if not debug_ops else debug_ops)
         results = self.sess.run(ops, feed_dict=feed_dict)
         summary = results[0]
-        exec_results = results[1:1 + len(exec_ops)]
-        debug_results = results[1 + len(exec_ops):]
+        base = 1
+        optim_results = results[base:base + len(optim_ops)]
+        base += len(optim_results)
+        exec_results = results[base:base + len(exec_ops)]
+        base += len(exec_results)
+        debug_results = results[base:]
         
         summary_writer.add_summary(summary, step)
         self._log_debug_ops(debug_results)
@@ -520,7 +530,7 @@ class VoxelVaegan():
         return exec_results
     
     def train(self, train_generator, dev_generator=None, test_generator=None, epochs=10, input_repeats=1, display_step=1,
-              save_step=1, viz_data=None):
+              save_step=1, viz_data=None, dev_step=10):
         
         start = time.time()
         
@@ -537,14 +547,13 @@ class VoxelVaegan():
 
         for epoch in range(epochs):
 
-            logging.info("Epoch: {}, ".format(epoch))
-            logging.info("Elapsed time: {:.2f} mins".format((time.time() - start) / 60))
+            logging.info("Epoch: {}, Elapsed Time: {}".format(epoch, elapsed_time(start)))
 
             ### Training Loop ###
             for batch_num, batch in enumerate(train_generator()):
                 
                 if self.verbose:
-                    logging.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch, batch_num, (time.time() - start) / 60))
+                    logging.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch, batch_num, elapsed_time(start)))
 
                 # repeat for extra practice on each shape
                 for _ in range(input_repeats):
@@ -559,10 +568,15 @@ class VoxelVaegan():
                                                debug_ops=debug_ops)
                     counter += 1
                     enc_loss, kl, recon, dis_loss, dec_loss = results
-                    self._save_model_step_results(epoch, enc_loss, kl, recon, dis_loss, dec_loss, ((time.time() - start) / 60))
+                    
+                    if self.verbose:
+                        self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
 
+                    self._save_model_step_results(epoch, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+
+                        
             if (epoch + 1) % display_step == 0:
-                self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss)
+                self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
                 if viz_data is not None:
                     self._train_recon_example(epoch, viz_data)
 

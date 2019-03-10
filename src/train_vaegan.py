@@ -103,7 +103,8 @@ def train_vaegan(cfg):
                      epochs=cfg_model.get('epochs'),
                      input_repeats=cfg_model.get('input_repeats'),
                      display_step=cfg_model.get('display_step'),
-                     save_step=cfg_model.get('save_step'))
+                     save_step=cfg_model.get('save_step'),
+                     dev_step=cfg_model.get('dev_step'))
         
         try:
             ex.info['metrics'] = vaegan.metrics
@@ -114,7 +115,7 @@ def train_vaegan(cfg):
             pass
 
     except Exception as exc:
-        logging.exception('Failed to train vae')
+        logging.exception('Failed to train vaegan')
         vaegan.close()
         raise(exc)
         

@@ -2,6 +2,7 @@ import logging.config
 import subprocess
 import requests
 import datetime
+import time
 import os
 
 
@@ -106,6 +107,13 @@ def kill_tensorboard():
     rc = p.returncode
     print('{} yielded -> {}'.format(cmd, output))
     if output:
-        subprocess.run(['kill', str(int(output))])
-        print('killed!')
+        tb_ids = output.split(b'\n')
+        for tb_id in tb_ids:
+            if len(tb_id) > 0:
+                subprocess.run(['kill', str(int(tb_id))])
+                print('killed {}!'.format(tb_id))
     return
+
+
+def elapsed_time(start):
+    return (time.time() - start) / 60
