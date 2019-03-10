@@ -50,6 +50,7 @@ def train_vaegan(cfg):
     
     # split
     splits = cfg.get('dataset').get('splits', None)
+    generator_cfg = cfg.get('generator')
     if splits:
         logging.info('Splitting Datasets')
         thingi_train, thingi_dev, thingi_test = thingi.split(splits['train'], splits['test'])
@@ -57,14 +58,14 @@ def train_vaegan(cfg):
         logging.info('Dev Length: {}'.format(len(thingi_dev)))
         logging.info('Test Length: {}'.format(len(thingi_test)))
         train_generator = lambda: thingi_train.voxels_batchmaker(
-            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=cfg_model.get('generator_verbose'))
+            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
         dev_generator = lambda: thingi_dev.voxels_batchmaker(
-            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=cfg_model.get('generator_verbose'))
+            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
         test_generator = lambda: thingi_test.voxels_batchmaker(
-            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=cfg_model.get('generator_verbose'))
+            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
     else:
         train_generator = lambda: thingi.voxels_batchmaker(
-            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=cfg_model.get('generator_verbose'))
+            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
         dev_generator = None
         test_generator = None
             

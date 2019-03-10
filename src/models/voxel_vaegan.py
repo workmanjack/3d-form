@@ -515,18 +515,26 @@ class VoxelVaegan():
         ops.extend([] if not optim_ops else optim_ops)
         ops.extend([] if not exec_ops else exec_ops)
         ops.extend([] if not debug_ops else debug_ops)
+        # execute
         results = self.sess.run(ops, feed_dict=feed_dict)
+        # retrieve results for each set of ops
         summary = results[0]
         base = 1
-        optim_results = results[base:base + len(optim_ops)]
-        base += len(optim_results)
-        exec_results = results[base:base + len(exec_ops)]
-        base += len(exec_results)
-        debug_results = results[base:]
+        if optim_ops:
+            optim_results = results[base:base + len(optim_ops)]
+            base += len(optim_results)
+        if exec_ops:
+            exec_results = results[base:base + len(exec_ops)]
+            base += len(exec_results)
+        if debug_ops:
+            debug_results = results[base:]
+            # write debug ops
+            self._log_debug_ops(debug_results)
         
+        # write to summary
         summary_writer.add_summary(summary, step)
-        self._log_debug_ops(debug_results)
-            
+
+        # only return the execs (the loss values)
         return exec_results
     
     def train(self, train_generator, dev_generator=None, test_generator=None, epochs=10, input_repeats=1, display_step=1,
@@ -547,7 +555,7 @@ class VoxelVaegan():
 
         for epoch in range(epochs):
 
-            logging.info("Epoch: {}, Elapsed Time: {}".format(epoch, elapsed_time(start)))
+            logging.info("Epoch: {}, Elapsed Time: {:.2f}".format(epoch, elapsed_time(start)))
 
             ### Training Loop ###
             for batch_num, batch in enumerate(train_generator()):
@@ -587,12 +595,14 @@ class VoxelVaegan():
                 for batch_num, batch in enumerate(dev_generator()):
                     
                     merge = tf.summary.merge_all()
-                    self._log_model_step_results(self._model_step(
+                    results = self._model_step(
                        feed_dict={self._input_x: batch, self._keep_prob:1.0, self._trainable: False},
                        step=counter,
                        summary_writer=dev_writer,
                        summary_op=merge,
-                       exec_ops=exec_ops))
+                       exec_ops=exec_ops)
+                    enc_loss, kl, recon, dis_loss, dec_loss = results
+                    self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
 
             ### Save Model Checkpoint ###
             if (epoch + 1) % save_step == 0:
@@ -603,14 +613,16 @@ class VoxelVaegan():
             logging.info('Evaluating Test')
 
             for batch_num, batch in enumerate(test_generator()):
-
-                merge = tf.summary.merge_all()
-                self._log_model_step_results(self._model_step(
-                   feed_dict={self._input_x: batch, self._keep_prob:1.0, self._trainable: False},
-                   step=counter,
-                   summary_writer=test_writer,
-                   summary_op=merge,
-                   exec_ops=exec_ops))
+                    
+                    merge = tf.summary.merge_all()
+                    results = self._model_step(
+                       feed_dict={self._input_x: batch, self._keep_prob:1.0, self._trainable: False},
+                       step=counter,
+                       summary_writer=test_writer,
+                       summary_op=merge,
+                       exec_ops=exec_ops)
+                    enc_loss, kl, recon, dis_loss, dec_loss = results
+                    self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
             
         return
     

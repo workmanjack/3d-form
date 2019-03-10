@@ -464,7 +464,17 @@ class Thingi10k(object):
                 vox_data = np.reshape(vox_data, shape)
         return vox_data
 
-    def voxels_batchmaker(self, batch_size, voxels_dim, verbose=False):
+    def voxels_batchmaker(self, batch_size, voxels_dim, verbose=False, pad=False):
+        """
+        A generator for batches of voxelized objects
+        
+        Args:
+            batch_size: int, size of each batch
+            voxels_dim: int, voxel object dimension (i.e. 32 for 32x32x32)
+            verbose: bool, print extra info or not
+            pad: bool, if False, dump remaining examples if not enough to form a batch
+                       if True, add all 0 voxel objects to complete batch
+        """
         batch = list()
         for i, stl_file in enumerate(self.df.stl_file):
             vox_data = self.get_voxels(voxels_dim, stl_file=stl_file, shape=[voxels_dim, voxels_dim, voxels_dim, 1])
@@ -476,6 +486,13 @@ class Thingi10k(object):
             if (i+1) % batch_size == 0:
                 yield np.asarray(batch)
                 batch = list()
+            if pad and (i+1 == len(self.df)):
+                # if we've reached the end of the loop and do not have enough for a batch
+                # (and if user said pad=True)
+                # then pad the batch and yield
+                for x in range(batch_size - len(batch)):
+                    batch.append(np.zeros([voxels_dim, voxels_dim, voxels_dim, 1]))
+                yield np.asarray(batch)
         return
     
     def split(self, train_split, test_size):
