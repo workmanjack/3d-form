@@ -419,35 +419,6 @@ class VoxelVaegan():
                 logging.debug(msg)
         return
 
-    def _model_step(self, feed_dict, step, summary_writer, summary_op, exec_ops, debug_ops):
-        """
-        Performs a single step of the model training process
-        
-        Writes summary_op result with summary_writer, prints debug_ops results, and returns
-        exec_ops results
-        
-        Args:
-            feed_dict: dict, model input tensorflow style
-            step: int, id of current step
-            summary_writer: tf summary writer for logging summary ops
-            summary_op: tf.tensor, summary op
-            exec_ops: list of tf.tensors, all tf tensors to execute and return
-            debug_ops: list of tf.tensors, debug ops
-            
-        Returns:
-            list, results of exec_ops
-        """
-        ops = tuple([summary_op] + exec_ops + debug_ops)
-        results = self.sess.run(ops, feed_dict=feed_dict)
-        summary = results[0]
-        exec_results = results[1:1 + len(exec_ops)]
-        debug_results = results[1 + len(exec_ops):]
-        
-        summary_writer.add_summary(summary, step)
-        self._log_debug_ops(debug_results)
-            
-        return exec_results
-    
     def _log_model_step_results(self, enc_loss, kl, recon, dis_loss, dec_loss):
         """
         Helper function for logging results from _model_step func
@@ -519,6 +490,35 @@ class VoxelVaegan():
         logging.info("Metrics saved in path: {}".format(metrics_json))
         return
         
+    def _model_step(self, feed_dict, step, summary_writer, summary_op, exec_ops, debug_ops):
+        """
+        Performs a single step of the model training process
+        
+        Writes summary_op result with summary_writer, prints debug_ops results, and returns
+        exec_ops results
+        
+        Args:
+            feed_dict: dict, model input tensorflow style
+            step: int, id of current step
+            summary_writer: tf summary writer for logging summary ops
+            summary_op: tf.tensor, summary op
+            exec_ops: list of tf.tensors, all tf tensors to execute and return
+            debug_ops: list of tf.tensors, debug ops
+            
+        Returns:
+            list, results of exec_ops
+        """
+        ops = tuple([summary_op] + exec_ops + debug_ops)
+        results = self.sess.run(ops, feed_dict=feed_dict)
+        summary = results[0]
+        exec_results = results[1:1 + len(exec_ops)]
+        debug_results = results[1 + len(exec_ops):]
+        
+        summary_writer.add_summary(summary, step)
+        self._log_debug_ops(debug_results)
+            
+        return exec_results
+    
     def train(self, train_generator, dev_generator=None, test_generator=None, epochs=10, input_repeats=1, display_step=1,
               save_step=1, viz_data=None):
         

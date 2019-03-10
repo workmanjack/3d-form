@@ -48,6 +48,26 @@ def train_vaegan(cfg):
     n_input = len(thingi)
     logging.info('Thingi10k n_input={}'.format(n_input))
     
+    # split
+    splits = cfg.get('dataset').get('splits', None)
+    if splits:
+        logging.info('Splitting Datasets')
+        thingi_train, thingi_dev, thingi_test = thingi.split(splits['train'], splits['test'])
+        logging.info('Train Length: {}'.format(len(thingi_train)))
+        logging.info('Dev Length: {}'.format(len(thingi_dev)))
+        logging.info('Test Length: {}'.format(len(thingi_test)))
+        train_generator = lambda: thingi_train.voxels_batchmaker(
+            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=cfg_model.get('generator_verbose'))
+        dev_generator = lambda: thingi_dev.voxels_batchmaker(
+            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=cfg_model.get('generator_verbose'))
+        test_generator = lambda: thingi_test.voxels_batchmaker(
+            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=cfg_model.get('generator_verbose'))
+    else:
+        train_generator = lambda: thingi.voxels_batchmaker(
+            batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=cfg_model.get('generator_verbose'))
+        dev_generator = None
+        test_generator = None
+            
     ### Prepare for Training
 
     cfg_model = cfg.get('model')
@@ -71,17 +91,15 @@ def train_vaegan(cfg):
 
     try:
         vaegan = VoxelVaegan.initFromCfg(cfg)
-
-        generator = lambda: thingi.voxels_batchmaker(batch_size=BATCH_SIZE,
-                                                     voxels_dim=VOXELS_DIM,
-                                                     verbose=cfg_model.get('generator_verbose'))
         
         if cfg_model.get('launch_tensorboard', False):
             tb_cmd = ['tensorboard', '--logdir', vaegan.tb_dir]
             logging.info(tb_cmd)
             tb_proc = subprocess.Popen(tb_cmd, stdout=subprocess.PIPE)
 
-        vaegan.train(generator,
+        vaegan.train(train_generator,
+                     dev_generator,
+                     test_generator,
                      epochs=cfg_model.get('epochs'),
                      input_repeats=cfg_model.get('input_repeats'),
                      display_step=cfg_model.get('display_step'),

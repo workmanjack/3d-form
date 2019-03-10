@@ -478,6 +478,16 @@ class Thingi10k(object):
                 batch = list()
         return
     
+    def split(self, train_split, test_size):
+        """
+        Assumes that you want dev & test to be the same size
+        """
+        df_train, df_dev, df_test = np.split(self.df.sample(frac=1), [int(train_split*len(self.df)), int(1-test_size*len(self.df))])
+        thingi_train = Thingi10k(df_train, self.index, self.pctile, self.stl_dir)
+        thingi_dev = Thingi10k(df_dev, self.index, self.pctile, self.stl_dir)
+        thingi_test = Thingi10k(df_test, self.index, self.pctile, self.stl_dir)
+        return thingi_train, thingi_dev, thingi_test
+    
     def __getitem__(self, n):
         return self.df.loc[n]
     
