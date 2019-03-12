@@ -341,8 +341,11 @@ class VoxelVaegan():
     
     def _make_discriminator_loss(self, dis_real_logits, dis_fake_logits, dis_lr):
         dis_loss_real = tf.reduce_mean(dis_real_logits)
+        self._add_debug_op('dis_loss_real', dis_loss_real, False)
         dis_loss_fake = tf.reduce_mean(dis_fake_logits)
+        self._add_debug_op('dis_loss_fake', dis_loss_fake, False)
         dis_loss = dis_loss_real - dis_loss_fake
+        self._add_debug_op('dis_loss', dis_loss, False)
         # thank you: https://stackoverflow.com/questions/36533723/tensorflow-get-all-variables-in-scope
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
         dis_optim = tf.train.RMSPropOptimizer(dis_lr).minimize(-dis_loss, var_list=var_list)
