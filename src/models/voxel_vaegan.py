@@ -24,7 +24,7 @@ class VoxelVaegan():
     SCOPE_DECODER = 'decoder'
     SCOPE_DISCRIMINATOR = 'discriminator'
     
-    def __init__(self, input_dim, latent_dim, enc_lr, dec_lr, dis_lr, keep_prob, verbose=False, 
+    def __init__(self, input_dim, latent_dim, enc_lr, dec_lr, dis_lr, keep_prob, verbose=False, no_gan=False,
                  kl_div_loss_weight=5, recon_loss_weight=5e-4, debug=False, ckpt_dir='voxel_vaegan', tb_dir='tb'):
         """
         Args:
@@ -47,6 +47,7 @@ class VoxelVaegan():
         self.latent_dim = latent_dim
         self.keep_prob = keep_prob
         self.verbose = verbose
+        self.no_gan = no_gan
         self.debug = debug
         self.kl_div_loss_weight = kl_div_loss_weight
         self.recon_loss_weight = recon_loss_weight
@@ -63,13 +64,14 @@ class VoxelVaegan():
         self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x, self._keep_prob, self._trainable)
         self.decoder = self._make_decoder(self.encoder, self._trainable)
 
-        self.dis_real, self.dis_real_logits = self._discriminator(self._input_x, self._trainable)
-        self.dis_fake, self.dis_fake_logits = self._discriminator(self.decoder, self._trainable)
-
         self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
                                                                                    self.enc_mu, self.enc_sig, enc_lr)
-        self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.dis_real_logits, self.dis_fake_logits, dis_lr)
-        self.dec_loss, self.dec_optim = self._make_decoder_loss(self.dis_fake_logits, dec_lr)
+
+        if self.no_gan:
+            logging.info('Running VAE-GAN in VAE-Only Mode')
+        else:
+            self.dis_real, self.dis_real_logits = self._discriminator(self._input_x, self._trainable)
+            self.dis_fake, self.dis_fake_logits = self._discriminator(self.decoder, self._trainable)
     
         # Initializing the tensor flow variables
         init = tf.global_variables_initializer()
@@ -101,7 +103,8 @@ class VoxelVaegan():
                      verbose=cfg_model.get('verbose'),
                      debug=cfg_model.get('debug'),
                      ckpt_dir=cfg_model.get('ckpt_dir'),
-                     tb_dir=cfg_model.get('tb_dir'))
+                     tb_dir=cfg_model.get('tb_dir'),
+                     no_gan=cfg_model.get('no_gan'))
         return vaegan
         
     def _log_shape(self, tensor, name=None):
@@ -308,16 +311,19 @@ class VoxelVaegan():
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
             lrelu1 = tf.nn.elu(conv1)
             self._log_shape(lrelu1)
+
             # 2nd hidden layer
             conv2 = tf.layers.conv3d(lrelu1, 256, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
             lrelu2 = tf.nn.elu(tf.layers.batch_normalization(conv2, training=trainable))
             self._log_shape(lrelu2)
+
             # 3rd hidden layer
             conv3 = tf.layers.conv3d(lrelu2, 512, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
             lrelu3 = tf.nn.elu(tf.layers.batch_normalization(conv3, training=trainable))
             self._log_shape(lrelu3)
+            
             # output layer
             #conv4 = tf.layers.conv3d(lrelu3, 1, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
             #                          kernel_initializer=tf.contrib.layers.xavier_initializer())
@@ -340,6 +346,7 @@ class VoxelVaegan():
         return dec_loss, dec_optim
     
     def _make_discriminator_loss(self, dis_real_logits, dis_fake_logits, dis_lr):
+        self._add_debug_op('dis_real_logits', dis_real_logits, False)
         dis_loss_real = tf.reduce_mean(dis_real_logits)
         self._add_debug_op('dis_loss_real', dis_loss_real, False)
         dis_loss_fake = tf.reduce_mean(dis_fake_logits)
@@ -373,9 +380,9 @@ class VoxelVaegan():
         #self._add_debug_op('max clipped_input', tf.math.reduce_max(clipped_input), False)
         #self._add_debug_op('min clipped_input', tf.math.reduce_min(clipped_input), False)
         #self._add_debug_op('mean clipped_input', tf.math.reduce_mean(clipped_input), False)
-        self._add_debug_op('max clipped_output', tf.math.reduce_max(clipped_output), False)
-        self._add_debug_op('min clipped_output', tf.math.reduce_min(clipped_output), False)
-        self._add_debug_op('mean clipped_output', tf.math.reduce_mean(clipped_output), False)
+        #self._add_debug_op('max clipped_output', tf.math.reduce_max(clipped_output), False)
+        #self._add_debug_op('min clipped_output', tf.math.reduce_min(clipped_output), False)
+        #self._add_debug_op('mean clipped_output', tf.math.reduce_mean(clipped_output), False)
         bce = -(98.0 * clipped_input * tf.log(clipped_output) + 2.0 * (1.0 - clipped_input) * tf.log(1.0 - clipped_output)) / 100.0
         #self._add_debug_op('bce', bce, False)
         #bce = tf.keras.backend.binary_crossentropy(enc_output, dec_output)
@@ -401,6 +408,9 @@ class VoxelVaegan():
         
         #optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(loss)
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
+        if self.no_gan:
+            # if no gan, we'll want this optimizer to update the decoder network's weights, too
+            var_list += self._get_vars_by_scope(self.SCOPE_DECODER)
         optimizer = tf.train.AdamOptimizer(learning_rate=enc_lr).minimize(loss, var_list=var_list)
 
         tf.summary.scalar("mean_kl", mean_kl) 
@@ -431,11 +441,11 @@ class VoxelVaegan():
         to represent all expected losses), but for now we use this function just to
         avoid writing the same log logic for train/dev/test output
         """
-        logging.info("Enc Loss = {:.5f}, ".format(enc_loss) + 
-                     "KL Divergence = {:.5f}, ".format(kl) +
-                     "Reconstruction Loss = {:.5f}, ".format(recon) +
-                     "-dis_Loss = {:.5f}, ".format(-dis_loss) +
-                     "dec_Loss = {:.5f}, ".format(dec_loss) +
+        logging.info("Enc Loss = {:.2f}, ".format(enc_loss) + 
+                     "KL Divergence = {:.2f}, ".format(kl) +
+                     "Reconstruction Loss = {:.2f}, ".format(recon) +
+                     "-dis_Loss = {:.2f}, ".format(-dis_loss) +
+                     "dec_Loss = {:.2f}, ".format(dec_loss) +
                      "Elapsed time: {:.2f} mins".format(elapsed_time))
         return
 
@@ -550,8 +560,11 @@ class VoxelVaegan():
         test_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'test'), self.sess.graph)
 
         counter = 0
-        optim_ops = [self.enc_optim, self.dec_optim, self.dis_optim]
-        exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon, self.dis_loss, self.dec_loss]
+        optim_ops = [self.enc_optim]
+        exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon]
+        if not self.no_gan:
+            optim_ops += [self.dec_optim, self.dis_optim]
+            exec_ops += [self.dis_loss, self.dec_loss]
         debug_ops = [op for name, op, _ in self._debug_ops]
         
         ### Begin Training ###
@@ -578,7 +591,13 @@ class VoxelVaegan():
                                                exec_ops=exec_ops,
                                                debug_ops=debug_ops)
                     counter += 1
-                    enc_loss, kl, recon, dis_loss, dec_loss = results
+                    if self.no_gan:
+                        enc_loss, kl, recon = results
+                        # we know these didn't run; set loss values for reporting purposes
+                        dis_loss = -999
+                        dec_loss = -999
+                    else:
+                        enc_loss, kl, recon, dis_loss, dec_loss = results
                     
                     if self.verbose:
                         self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
@@ -604,7 +623,13 @@ class VoxelVaegan():
                        summary_writer=dev_writer,
                        summary_op=merge,
                        exec_ops=exec_ops)
-                    enc_loss, kl, recon, dis_loss, dec_loss = results
+                    if self.no_gan:
+                        enc_loss, kl, recon = results
+                        # we know these didn't run; set loss values for reporting purposes
+                        dis_loss = -999
+                        dec_loss = -999
+                    else:
+                        enc_loss, kl, recon, dis_loss, dec_loss = results
                     self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
 
             ### Save Model Checkpoint ###
@@ -624,7 +649,13 @@ class VoxelVaegan():
                        summary_writer=test_writer,
                        summary_op=merge,
                        exec_ops=exec_ops)
-                    enc_loss, kl, recon, dis_loss, dec_loss = results
+                    if self.no_gan:
+                        enc_loss, kl, recon = results
+                        # we know these didn't run; set loss values for reporting purposes
+                        dis_loss = -999
+                        dec_loss = -999
+                    else:
+                        enc_loss, kl, recon, dis_loss, dec_loss = results
                     self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
             
         return
