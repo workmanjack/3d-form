@@ -36,7 +36,7 @@ def train_vaegan(cfg):
 
     index_file = cfg.get('dataset').get('index')
     pctile = cfg.get('dataset').get('pctile', None)
-    logging.info('Using thingi10k with index {} and pctile {}'.format(index_file, pctile))
+    logging.info('Using dataset index {} and pctile {}'.format(index_file, pctile))
     thingi = Thingi10k.initFromIndex(index=index_file, pctile=pctile)
     # apply filter
     tag = cfg.get('dataset').get('tag', None)

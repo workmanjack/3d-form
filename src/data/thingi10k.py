@@ -1,6 +1,6 @@
 # project imports
-from data.stl import read_mesh_vectors, voxelize_stl
-from data.voxels import read_voxel_array
+from data.stl import read_mesh_vectors
+from data.voxels import read_voxel_array, voxelize_file
 from data import RAW_DIR, VOXELS_DIR, THINGI10K_STL_DIR, THINGI10K_INDEX, THINGI10K_INDEX_10, THINGI10K_INDEX_100, THINGI10K_INDEX_1000
 from utils import api_json, dataframe_pctile_slice
 
@@ -452,7 +452,7 @@ class Thingi10k(object):
             print('{}: {}'.format(i, stl_file))
         # read in stl file, read in vectors, apply ops as instructed
         stl_path = os.path.join(self.stl_dir, stl_file)
-        vox_path = voxelize_stl(stl_path, dest_dir=os.path.join(VOXELS_DIR, str(voxels_dim)), size=voxels_dim, verbose=verbose)
+        vox_path = voxelize_file(stl_path, dest_dir=os.path.join(VOXELS_DIR, str(voxels_dim)), size=voxels_dim, verbose=verbose)
         if vox_path is None:
             # sometimes voxelization can fail, so we skip and move on to the next one
             vox_data = None
