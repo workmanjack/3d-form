@@ -41,7 +41,7 @@ def train_vaegan(cfg):
     # apply filter
     tag = cfg.get('dataset').get('tag', None)
     if tag:
-        logging.info('Filtering thingi10k by tag: {}'.format(tag))
+        logging.info('Filtering dataset by tag: {}'.format(tag))
         thingi.filter_by_tag(tag)
     filter_id = cfg.get('dataset').get('filter_id', None)
     if filter_id:

@@ -7,7 +7,7 @@ import os
 
 
 from data import DATA_DIR, THINGI10K_INDEX, THINGI10K_INDEX_100, THINGI10K_INDEX_10, THINGI10K_INDEX_1000
-from data import MODELNET10_DIR, MODELNET10_INDEX
+from data import MODELNET10_DIR, MODELNET10_INDEX, MODELNET10_TOILET_INDEX
 from data.thingi10k import make_thingi10k_index
 from data.modelnet10 import make_modelnet10_index
 
@@ -30,7 +30,8 @@ def main():
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, limit=100)
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000)
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
-    make_modelnet10_index(MODELNET10_DIR, MODELNET10_INDEX)
+    make_modelnet10_index(MODELNET10_DIR, MODELNET10_TOILET_INDEX, categories=['toilet'])
+    #make_modelnet10_index(MODELNET10_DIR, MODELNET10_INDEX)
 
 
 if __name__ == '__main__':

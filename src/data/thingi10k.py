@@ -1,5 +1,6 @@
 # project imports
 from data.stl import read_mesh_vectors
+from data.dataset import IndexedDataset
 from data.voxels import read_voxel_array, voxelize_file
 from data import RAW_DIR, VOXELS_DIR, THINGI10K_STL_DIR, THINGI10K_INDEX, THINGI10K_INDEX_10, THINGI10K_INDEX_100, THINGI10K_INDEX_1000
 from utils import api_json, dataframe_pctile_slice
@@ -144,31 +145,15 @@ def make_thingi10k_index(data_dir, index_path, limit=None, get_json=True, get_im
     print('Index written to {}'.format(index_path))
 
 
-class Thingi10k(object):
+class Thingi10k(IndexedDataset):
+    
+    PCTILE_COL = 'num_vertices'
+    ID_COL = 'stl_file'
     
     def __init__(self, df, index, pctile, stl_dir=THINGI10K_STL_DIR):
-        self.index = index
-        self.df = df
-        self.pctile = pctile
+        super().__init__(df, index, pctile)
         self.stl_dir = stl_dir
         return 
-    
-    @classmethod
-    def initFromIndex(cls, index, pctile=None):
-        """
-        Create a pandas df of the provided index file
-
-        Args:
-            index: str, path to thingi10k index file
-            pctile: float, limit selection to at or below this pctile of num_vertices (0 to 1)
-
-        Returns:
-            pd.DataFrame
-        """
-        df = pd.read_csv(index)
-        if pctile:
-            df = dataframe_pctile_slice(df, 'num_vertices', pctile)
-        return cls(df, index, pctile)
             
     @classmethod
     def init1000(cls, pctile=None):
@@ -185,14 +170,6 @@ class Thingi10k(object):
     @classmethod
     def init10k(cls, pctile=None):
         return cls.initFromIndex(THINGI10K_INDEX, pctile)
-
-    def filter_to_just_one(self):
-        self.df = self.df[:1]
-        return
-    
-    def filter_by_id(self, stl_id):
-        self.df = self.df[self.df.stl_file.str.contains("{}".format(stl_id))]
-        return
     
     def filter_by_tag(self, tag):
         """
@@ -504,12 +481,6 @@ class Thingi10k(object):
         thingi_dev = Thingi10k(df_dev, self.index, self.pctile, self.stl_dir)
         thingi_test = Thingi10k(df_test, self.index, self.pctile, self.stl_dir)
         return thingi_train, thingi_dev, thingi_test
-    
-    def __getitem__(self, n):
-        return self.df.loc[n]
-    
-    def __len__(self):
-        return len(self.df)
 
     def __repr__(self):
         return '<Thingi10k(index={}, n={}, pctile={})'.format(self.index, len(self), self.pctile)

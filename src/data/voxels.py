@@ -143,6 +143,7 @@ def voxelize_file(input_file, ext='stl', dest_dir=VOXELS_DIR, check_if_exists=Tr
     binvox_suffix = binvox_suffix if binvox_suffix else ''
     binvox_output = input_file.replace('.{}'.format(ext), '.binvox')
     binvox_dest = os.path.join(dest_dir, os.path.basename(binvox_output))
+    binvox_dest = binvox_dest.replace('.binvox', '{}.binvox'.format(binvox_suffix))
     exists = os.path.exists(binvox_dest)
     if check_if_exists and exists:
         if verbose:
@@ -173,7 +174,6 @@ def voxelize_file(input_file, ext='stl', dest_dir=VOXELS_DIR, check_if_exists=Tr
         binvox_dest = None
     elif binvox_dest is not None:
         # here we move it to the desired dest
-        binvox_dest = binvox_dest.replace('.binvox', '{}.binvox'.format(binvox_suffix))
         os.rename(binvox_output, binvox_dest)
         if verbose:
             print('renamed {} to {}'.format(binvox_output, binvox_dest))
