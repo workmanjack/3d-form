@@ -604,7 +604,6 @@ class VoxelVaegan():
 
                     self._save_model_step_results(epoch, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
 
-                        
             if (epoch + 1) % display_step == 0:
                 self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
                 if viz_data is not None:

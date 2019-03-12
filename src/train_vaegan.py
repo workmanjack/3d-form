@@ -37,14 +37,16 @@ def train_vaegan(cfg):
     index_file = cfg.get('dataset').get('index')
     pctile = cfg.get('dataset').get('pctile', None)
     logging.info('Using thingi10k with index {} and pctile {}'.format(index_file, pctile))
-    thingi = Thingi10k.initFromIndex(index=index_file,
-                                     pctile=pctile)
+    thingi = Thingi10k.initFromIndex(index=index_file, pctile=pctile)
     # apply filter
     tag = cfg.get('dataset').get('tag', None)
     if tag:
         logging.info('Filtering thingi10k by tag: {}'.format(tag))
         thingi.filter_by_tag(tag)
-    #thingi.filter_by_id(1351747)
+    filter_id = cfg.get('dataset').get('filter_id', None)
+    if filter_id:
+        logging.info('Filtering thingi10k by id: {}'.format(filter_id))
+        thingi.filter_by_id(filter_id)
     n_input = len(thingi)
     logging.info('Thingi10k n_input={}'.format(n_input))
     
