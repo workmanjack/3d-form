@@ -26,6 +26,10 @@ class IndexedDataset(object):
         if pctile and cls.PCTILE_COL:
             df = dataframe_pctile_slice(df, cls.PCTILE_COL, pctile)
         return cls(df, index, pctile)
+    
+    def shuffle(self):
+        self.df = self.df.reindex(np.random.permutation(self.df.index))
+        return
 
     def filter_to_just_one(self):
         self.df = self.df[:1]

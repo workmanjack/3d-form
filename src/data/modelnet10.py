@@ -91,10 +91,23 @@ class ModelNet10(IndexedDataset):
             vox_data = np.reshape(vox_data, shape)
         return vox_data
 
-    def voxels_batchmaker(self, batch_size, verbose=False, pad=False):
+    def voxels_batchmaker(self, batch_size, voxels_dim, set_filter=None, verbose=False, pad=False):
+        """
+        Args:
+            batch_size: int
+            set_filter: str, "train" or "test" or None; returns specified dataset or both
+            verbose: bool, extra debug prints
+            pad: bool, pads final batch with all-zero examples or skips remainder
+        """
         batch = list()
-        for i, (index, row) in enumerate(self.df.iterrows()):
-            vox_data = self.get_voxels(row['category'], row['dataset'], row['binvox'])
+        if set_filter in ['train', 'test']:
+            df_slicer = self.df.dataset == set_filter
+            if verbose:
+                print('Creating dataset split for "{}"'.format(set_filter))
+        else:
+            df_slicer = self.df == self.df
+        for i, (index, row) in enumerate(self.df[df_slicer].iterrows()):
+            vox_data = self.get_voxels(row['category'], row['dataset'], row['binvox'], shape=[voxels_dim, voxels_dim, voxels_dim, 1])
             if vox_data is None:
                 continue
             # each element has 1 "channel" aka data point (if RGB color, it would be 3)
