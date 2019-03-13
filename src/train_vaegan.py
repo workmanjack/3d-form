@@ -119,14 +119,24 @@ def train_vaegan(cfg):
             logging.info(tb_cmd)
             tb_proc = subprocess.Popen(tb_cmd, stdout=subprocess.PIPE)
 
-        vaegan.train(train_generator,
-                     dev_generator,
-                     test_generator,
-                     epochs=cfg_model.get('epochs'),
-                     input_repeats=cfg_model.get('input_repeats'),
-                     display_step=cfg_model.get('display_step'),
-                     save_step=cfg_model.get('save_step'),
-                     dev_step=cfg_model.get('dev_step'))
+        count = 0
+        for epochs, rate in cfg_model.get('learning_rate'):
+            
+            # Use learning rate for set number of epochs
+            # If set number is None, then continue for rest of total
+            num_epochs = epochs if epochs is not None else int(cfg_model.get('epochs')) - count
+            
+            vaegan.train(train_generator,
+                         dev_generator,
+                         test_generator,
+                         epochs=num_epochs,
+                         input_repeats=cfg_model.get('input_repeats'),
+                         display_step=cfg_model.get('display_step'),
+                         save_step=cfg_model.get('save_step'),
+                         dev_step=cfg_model.get('dev_step'),
+                         learning_rate=rate)
+            
+            count += num_epochs
         
         try:
             ex.info['metrics'] = vaegan.metrics

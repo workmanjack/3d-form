@@ -24,7 +24,7 @@ class VoxelVaegan():
     SCOPE_DECODER = 'decoder'
     SCOPE_DISCRIMINATOR = 'discriminator'
     
-    def __init__(self, input_dim, latent_dim, enc_lr, dec_lr, dis_lr, keep_prob, verbose=False, no_gan=False,
+    def __init__(self, input_dim, latent_dim, keep_prob, verbose=False, no_gan=False,
                  kl_div_loss_weight=5, recon_loss_weight=5e-4, debug=False, ckpt_dir='voxel_vaegan', tb_dir='tb'):
         """
         Args:
@@ -55,6 +55,7 @@ class VoxelVaegan():
         self._input_x = tf.placeholder(tf.float32, shape=(None, self.input_dim, self.input_dim, self.input_dim, 1))
         self._keep_prob = tf.placeholder(dtype=tf.float32)
         self._trainable = tf.placeholder(dtype=tf.bool)
+        self._learning_rate = tf.placeholder(dtype=tf.float32)
 
         # add ops to this list as a tuple with (<op name>, <op>) to see them executed, returned, and printed
         # to console during execution
@@ -65,13 +66,16 @@ class VoxelVaegan():
         self.decoder = self._make_decoder(self.encoder, self._trainable)
 
         self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
-                                                                                   self.enc_mu, self.enc_sig, enc_lr)
+                                                                                   self.enc_mu, self.enc_sig)
 
         if self.no_gan:
             logging.info('Running VAE-GAN in VAE-Only Mode')
         else:
             self.dis_real, self.dis_real_logits = self._discriminator(self._input_x, self._trainable)
             self.dis_fake, self.dis_fake_logits = self._discriminator(self.decoder, self._trainable)
+            
+            self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.dis_real_logits, self.dis_fake_logits)
+            self.dec_loss, self.dec_optim = self._make_decoder_loss(self.dis_fake_logits)
     
         # Initializing the tensor flow variables
         init = tf.global_variables_initializer()
@@ -94,9 +98,6 @@ class VoxelVaegan():
         cfg_model = cfg.get('model')
         vaegan = cls(input_dim=cfg_model.get('voxels_dim'),
                      latent_dim=cfg_model.get('latent_dim'),
-                     enc_lr=cfg_model.get('enc_lr'),
-                     dec_lr=cfg_model.get('dec_lr'),
-                     dis_lr=cfg_model.get('dis_lr'),
                      keep_prob=cfg_model.get('keep_prob'),
                      kl_div_loss_weight=cfg_model.get('kl_div_loss_weight'),
                      recon_loss_weight=cfg_model.get('recon_loss_weight'),
@@ -338,14 +339,14 @@ class VoxelVaegan():
     def _get_vars_by_scope(self, scope):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
     
-    def _make_decoder_loss(self, dis_fake_logits, dec_lr):
+    def _make_decoder_loss(self, dis_fake_logits):
         dec_loss = -tf.reduce_mean(dis_fake_logits)
         var_list = self._get_vars_by_scope(self.SCOPE_DECODER)
-        dec_optim = tf.train.RMSPropOptimizer(dec_lr).minimize(dec_loss, var_list=var_list)
+        dec_optim = tf.train.RMSPropOptimizer(self._learning_rate).minimize(dec_loss, var_list=var_list)
         tf.summary.scalar("dec_loss", dec_loss) 
         return dec_loss, dec_optim
     
-    def _make_discriminator_loss(self, dis_real_logits, dis_fake_logits, dis_lr):
+    def _make_discriminator_loss(self, dis_real_logits, dis_fake_logits):
         self._add_debug_op('dis_real_logits', dis_real_logits, False)
         dis_loss_real = tf.reduce_mean(dis_real_logits)
         self._add_debug_op('dis_loss_real', dis_loss_real, False)
@@ -355,12 +356,12 @@ class VoxelVaegan():
         self._add_debug_op('dis_loss', dis_loss, False)
         # thank you: https://stackoverflow.com/questions/36533723/tensorflow-get-all-variables-in-scope
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
-        dis_optim = tf.train.RMSPropOptimizer(dis_lr).minimize(-dis_loss, var_list=var_list)
+        dis_optim = tf.train.RMSPropOptimizer(self._learning_rate).minimize(-dis_loss, var_list=var_list)
         tf.summary.scalar('dis_loss_real', dis_loss_real)
         tf.summary.scalar('dis_loss_fake', dis_loss_fake)
         return dis_loss, dis_optim
     
-    def _make_encoder_loss(self, enc_input, dec_output, z_mu, z_sig, enc_lr):
+    def _make_encoder_loss(self, enc_input, dec_output, z_mu, z_sig):
         """
         Info on loss in VAE:
           * https://stats.stackexchange.com/questions/332179/how-to-weight-kld-loss-vs-reconstruction-loss-in-variational-auto-encoder
@@ -406,12 +407,11 @@ class VoxelVaegan():
         loss = tf.reduce_mean(self.kl_div_loss_weight * kl_divergence + self.recon_loss_weight * recon_loss)
         #self._add_debug_op('loss', loss, False)
         
-        #optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(loss)
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
         if self.no_gan:
             # if no gan, we'll want this optimizer to update the decoder network's weights, too
             var_list += self._get_vars_by_scope(self.SCOPE_DECODER)
-        optimizer = tf.train.AdamOptimizer(learning_rate=enc_lr).minimize(loss, var_list=var_list)
+        optimizer = tf.train.AdamOptimizer(learning_rate=self._learning_rate).minimize(loss, var_list=var_list)
 
         tf.summary.scalar("mean_kl", mean_kl) 
         tf.summary.scalar("mean_recon", mean_recon) 
@@ -551,7 +551,7 @@ class VoxelVaegan():
         return exec_results
     
     def train(self, train_generator, dev_generator=None, test_generator=None, epochs=10, input_repeats=1, display_step=1,
-              save_step=1, viz_data=None, dev_step=10):
+              save_step=1, viz_data=None, dev_step=10, learning_rate=0.0001):
         
         start = time.time()
         
@@ -569,21 +569,33 @@ class VoxelVaegan():
         
         ### Begin Training ###
 
+        inputs = 0
         for epoch in range(epochs):
 
             logging.info("Epoch: {}, Elapsed Time: {:.2f}".format(epoch, elapsed_time(start)))
+            batch_progress = 0
 
             ### Training Loop ###
             for batch_num, batch in enumerate(train_generator()):
                 
                 if self.verbose:
-                    logging.debug('Epoch: {}, Batch: {}, Elapsed time: {:.2f} mins'.format(epoch, batch_num, elapsed_time(start)))
+                    # keep track of how many inputs we have
+                    if epoch == 0:
+                        inputs += len(batch)
+                    else:
+                        batch_progress += len(batch)
 
-                # repeat for extra practice on each shape
+                    logging.debug('Epoch: {} / {}, Batch: {} ({} / {}), Elapsed time: {:.2f} mins'.format(
+                        epoch, epochs, batch_num, batch_progress, inputs, elapsed_time(start)))
+
+                # optional repeats for extra practice on each shape
                 for _ in range(input_repeats):
                     
                     merge = tf.summary.merge_all()
-                    results = self._model_step(feed_dict={self._input_x: batch, self._keep_prob:self.keep_prob, self._trainable: True},
+                    results = self._model_step(feed_dict={self._input_x: batch,
+                                                          self._keep_prob:self.keep_prob,
+                                                          self._learning_rate: learning_rate,
+                                                          self._trainable: True},
                                                step=counter,
                                                summary_writer=train_writer,
                                                summary_op=merge,
