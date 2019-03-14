@@ -107,8 +107,8 @@ class ModelNet10(IndexedDataset):
         batch = list()
         if set_filter in ['train', 'test']:
             df_slicer = self.df.dataset == set_filter
-            if verbose:
-                print('Creating dataset split for "{}"'.format(set_filter))
+            #if verbose:
+            #    print('Creating dataset split for "{}"'.format(set_filter))
         else:
             df_slicer = self.df == self.df
         for i, (index, row) in enumerate(self.df[df_slicer].iterrows()):

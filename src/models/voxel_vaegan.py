@@ -51,6 +51,7 @@ class VoxelVaegan():
         self.debug = debug
         self.kl_div_loss_weight = kl_div_loss_weight
         self.recon_loss_weight = recon_loss_weight
+        self.step = 0
         
         self._input_x = tf.placeholder(tf.float32, shape=(None, self.input_dim, self.input_dim, self.input_dim, 1))
         self._keep_prob = tf.placeholder(dtype=tf.float32)
@@ -559,7 +560,6 @@ class VoxelVaegan():
         dev_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'dev'), self.sess.graph)
         test_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'test'), self.sess.graph)
 
-        counter = 0
         optim_ops = [self.enc_optim]
         exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon]
         if not self.no_gan:
@@ -596,13 +596,13 @@ class VoxelVaegan():
                                                           self._keep_prob:self.keep_prob,
                                                           self._learning_rate: learning_rate,
                                                           self._trainable: True},
-                                               step=counter,
+                                               step=self.step,
                                                summary_writer=train_writer,
                                                summary_op=merge,
                                                optim_ops=optim_ops,
                                                exec_ops=exec_ops,
                                                debug_ops=debug_ops)
-                    counter += 1
+                    self.step += 1
                     if self.no_gan:
                         enc_loss, kl, recon = results
                         # we know these didn't run; set loss values for reporting purposes
@@ -630,7 +630,7 @@ class VoxelVaegan():
                     merge = tf.summary.merge_all()
                     results = self._model_step(
                        feed_dict={self._input_x: batch, self._keep_prob:1.0, self._trainable: False},
-                       step=counter,
+                       step=self.step,
                        summary_writer=dev_writer,
                        summary_op=merge,
                        exec_ops=exec_ops)
@@ -656,7 +656,7 @@ class VoxelVaegan():
                     merge = tf.summary.merge_all()
                     results = self._model_step(
                        feed_dict={self._input_x: batch, self._keep_prob:1.0, self._trainable: False},
-                       step=counter,
+                       step=self.step,
                        summary_writer=test_writer,
                        summary_op=merge,
                        exec_ops=exec_ops)

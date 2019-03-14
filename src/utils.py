@@ -117,3 +117,7 @@ def kill_tensorboard():
 
 def elapsed_time(start):
     return (time.time() - start) / 60
+
+
+def compare_cfgs(cfg1, cfg2):
+    return

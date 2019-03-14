@@ -115,7 +115,11 @@ def train_vaegan(cfg):
         vaegan = VoxelVaegan.initFromCfg(cfg)
         
         if cfg_model.get('launch_tensorboard', False):
-            tb_cmd = ['tensorboard', '--logdir', vaegan.tb_dir]
+            logdir = 'current:{}'.format(vaegan.tb_dir)
+            if cfg_model.get('tb_compare', False):
+                for tb_compare in cfg_model.get('tb_compare'):
+                    logdir += ',{}:{}'.format(tb_compare[0], tb_compare[1])
+            tb_cmd = ['tensorboard', '--logdir', logdir]
             logging.info(tb_cmd)
             tb_proc = subprocess.Popen(tb_cmd, stdout=subprocess.PIPE)
 
