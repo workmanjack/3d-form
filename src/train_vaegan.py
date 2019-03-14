@@ -4,6 +4,7 @@ from models.voxel_vaegan import VoxelVaegan
 from data.thingi10k import Thingi10k
 from data.modelnet10 import ModelNet10
 from data.voxels import plot_voxels
+from models import MODEL_DIR
 
 
 # python & package imports
@@ -34,10 +35,18 @@ def train_vaegan(cfg):
     logging.info('Starting train_vaegan main')
     logging.info('Numpy random seed: {}'.format(np.random.get_state()[1][0]))
     
+    ### Save Config
+    
+    cfg_path = os.path.join(MODEL_DIR, cfg.get('model').get('ckpt_dir'), 'cfg.json')
+    with open(cfg_path, 'w') as outfile:
+        json.dump(cfg, outfile)
+    logging.info('Saved cfg: {}'.format(cfg_path))
+    
     ### Get Dataset
 
     index_file = cfg.get('dataset').get('index')
-    dataset_class = cfg.get('dataset').get('class')
+    dataset_type = cfg.get('dataset').get('class')
+    dataset_class = ModelNet10 if dataset_type == 'ModelNet10' else 'Thingi10k'
     logging.info('Dataset: {}'.format(dataset_class))
     pctile = cfg.get('dataset').get('pctile', None)
     logging.info('Using dataset index {} and pctile {}'.format(index_file, pctile))
@@ -64,7 +73,7 @@ def train_vaegan(cfg):
     # split
     splits = cfg.get('dataset').get('splits', None)
     generator_cfg = cfg.get('generator')
-    if dataset_class == Thingi10k and splits:
+    if dataset_class == 'Thingi10k' and splits:
         # splits only supported by Thingi10k
         logging.info('Splitting Datasets')
         thingi_train, thingi_dev, thingi_test = dataset.split(splits['train'], splits['test'])
@@ -77,7 +86,7 @@ def train_vaegan(cfg):
             batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
         test_generator = lambda: thingi_test.voxels_batchmaker(
             batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
-    elif dataset_class == ModelNet10 and splits:
+    elif dataset_class == 'ModelNet10' and splits:
         logging.info('Splitting Datasets')
         train_generator = lambda: dataset.voxels_batchmaker(
             batch_size=BATCH_SIZE, set_filter='train', voxels_dim=VOXELS_DIM,

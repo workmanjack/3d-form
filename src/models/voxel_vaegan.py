@@ -1,5 +1,4 @@
 # project imports
-from models import MODEL_DIR
 from utils import elapsed_time
 
 
@@ -82,7 +81,7 @@ class VoxelVaegan():
         init = tf.global_variables_initializer()
         
         # Setup Model Saving
-        self.ckpt_dir = os.path.join(MODEL_DIR, ckpt_dir)
+        self.ckpt_dir = ckpt_dir
         self.tb_dir = os.path.join(self.ckpt_dir, tb_dir)
         os.makedirs(tb_dir, exist_ok=True)
         self.saver = tf.train.Saver()
