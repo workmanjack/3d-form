@@ -1,4 +1,5 @@
 import logging.config
+import collections
 import subprocess
 import requests
 import datetime
@@ -124,27 +125,46 @@ def elapsed_time(start):
 
 
 def compare_dicts(a, b, root='root', tabs=0):
+    """
+    doesn't quite work as hoped
+    """
     keys_in_a_not_b = set(a.keys()).difference(set(b.keys()))
     keys_in_b_not_a = set(b.keys()).difference(set(a.keys()))
     same = set(a.keys()).intersection(set(b.keys()))
-    tabs = '\t' * tabs
+    tabsp = '\t' * tabs
+    tabsp1 = tabsp + '\t'
     for k in keys_in_a_not_b:
-        print(tabs + '[{}] In A, Not B:'.format(root))           
-        print((tabs+1) + '{}: {}'.format(k, a[k]))
+        print(tabsp + '[{}] In A, Not B:'.format(root))           
+        print(tabsp1 + '{}: {}'.format(k, a[k]))
     for k in keys_in_b_not_a:
-        print(tabs + '[{}] In B, Not A:'.format(root))           
-        print((tabs+1) + '{}: {}'.format(k, b[k]))
+        print(tabsp + '[{}] In B, Not A:'.format(root))           
+        print(tabsp1 + '{}: {}'.format(k, b[k]))
     for k in same:
         aval = a[k]
         bval = b[k]
         if aval == bval:
-            print(tabs + '[{}] Same:'.format(root))
-            print((tabs+1) + '{}: {}'.format(k, aval))
+            print(tabsp + '[{}] Same:'.format(root))
+            print(tabsp1 + '{}: {}'.format(k, aval))
         elif isinstance(aval, dict):
             # check assumption that if aval is dict then bval is dict
-            assert isinstace(bval, dict)
+            assert isinstance(bval, dict)
             compare_dicts(aval, bval, root=k, tabs=tabs+1)
         else:
-            print(tabs + '[{}] Different:'.format(root))
-            print((tabs+1) + '{}: {}'.format(k, aval))
+            print(tabsp + '[{}] Different:'.format(root))
+            print(tabsp1 + '{}: {}'.format(k, aval))
     return
+
+
+def flatten_dict(d, parent_key='', sep='/'):
+    """
+    https://stackoverflow.com/questions/6027558/flatten-nested-python-dictionaries-compressing-keys
+    """
+    items = []
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, collections.MutableMapping):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+            
