@@ -31,7 +31,7 @@ def process_modelnet10_model_dir(model_dir, voxels_dim=32):
         model_file = os.path.join(model_dir, model_file)
         for x in range(4):
             for z in range(4):
-                voxel_file = voxelize_file(model_file, ext='off', dest_dir=None, size=voxels_dim, verbose=True,
+                voxel_file = voxelize_file(model_file, ext='off', dest_dir=None, size=voxels_dim, verbose=True, timeout=120,
                                            num_rotx=x, num_rotz=z, binvox_suffix='_{}_x{}_z{}'.format(voxels_dim, x, z))
                 voxel_file_info = [os.path.basename(model_file), os.path.basename(voxel_file), voxels_dim, x, z]
                 voxel_files.append(voxel_file_info)
