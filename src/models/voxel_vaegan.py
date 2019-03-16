@@ -76,12 +76,12 @@ class VoxelVaegan():
             self.dis_dec_output, self.dis_dec_ll = self._discriminator(self.dec_random, self._trainable)
             
             self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.dis_input_output, self.dis_dec_output)
-            self.dec_loss, self.dec_optim = self._make_decoder_loss(self.dis_fake)
             
             self.ll_loss = self._make_ll_loss(self.dis_input_ll, self.dis_dec_ll)
             
+            self.dec_loss, self.dec_optim = self._make_decoder_loss(self.dec_random, self.ll_loss)
             self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
-                                                                           self.enc_mu, self.enc_sig, ll_loss=ll_loss)
+                                                                           self.enc_mu, self.enc_sig, ll_loss=self.ll_loss)
 
     
         # Initializing the tensor flow variables
@@ -123,7 +123,7 @@ class VoxelVaegan():
         return
     
     def _random_latent(self):
-        return tf.random_normal(tf.stack([tf.shape(dense1)[0], self.latent_dim]))
+        return tf.random_normal(tf.stack([self._batch_size, self.latent_dim]))
     
     def _make_encoder(self, input_x, keep_prob, trainable):
         
@@ -201,6 +201,7 @@ class VoxelVaegan():
             self._log_shape(enc_sig)
 
             # epsilon is a random draw from the latent space
+            self._batch_size = tf.shape(dense1)[0]
             epsilon = self._random_latent()
             self._log_shape(epsilon, 'epsilon')
             enc_z = enc_mu + tf.multiply(epsilon, tf.exp(enc_sig))
@@ -362,16 +363,16 @@ class VoxelVaegan():
     def _get_vars_by_scope(self, scope):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
     
-    def _make_decoder_loss(self, dis_fake_logits, ll_loss):
+    def _make_decoder_loss(self, dec_random, ll_loss):
         
         # old
         #dec_loss = -tf.reduce_mean(dis_fake_logits)
         
         # Loss
-        G_loss = tf.reduce_mean(-1. * (tf.log(tf.clip_by_value(d_x_p, 1e-5, 1.0))))
+        dec_loss = tf.reduce_mean(-1. * (tf.log(tf.clip_by_value(dec_random, 1e-5, 1.0))))
         # TODO: see example code for how these weights are set and why
-        self.ll_weight = 0
-        self.dec_weight = 0
+        self.ll_weight = 1
+        self.dec_weight = 1
         dec_loss = tf.clip_by_value(ll_loss * self.ll_weight + dec_loss * self.dec_weight, -100, 100)
         
         # Optimizer
@@ -392,7 +393,7 @@ class VoxelVaegan():
         """
         dis_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(dis_input_output, 1e-5, 1.0)) + 
                                     tf.log(tf.clip_by_value(1.0 - dis_dec_output, 1e-5, 1.0))))
-        dis_loss = tf.clip_by_value(D_loss, -100, 100)
+        dis_loss = tf.clip_by_value(dis_loss, -100, 100)
         
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
@@ -474,7 +475,8 @@ class VoxelVaegan():
         
         # Voxel-Wise Reconstruction Loss 
         # Note that the output values are clipped to prevent the BCE from evaluating log(0).
-        mean_recon = tf.reduce_mean(bce, 1)
+        recon_loss = tf.reduce_mean(bce, 1)
+        mean_recon = tf.reduce_mean(recon_loss)
    
         #recon_loss = tf.reduce_sum(tf.squared_difference(
         #    tf.reshape(dec_output, (-1, self.input_dim ** 3)),
@@ -486,16 +488,15 @@ class VoxelVaegan():
         mean_kl = tf.reduce_mean(kl_divergence)
 
         #self._add_debug_op('mean_kl', mean_kl, False)
-        #self._add_debug_op('mean_recon', mean_recon, False)
 
         # tf reduce_mean: https://www.tensorflow.org/api_docs/python/tf/math/reduce_mean
         if self.no_gan:
             # if no gan, we include the reconstruction loss as a factor here
-            loss = self.kl_div_loss_weight * mean_kl + self.recon_loss_weight * mean_recon
+            loss = tf.reduce_mean(self.kl_div_loss_weight * kl_divergence + self.recon_loss_weight * recon_loss)
         else:
             # otherwise, we use the discriminator's input
             #L_e = tf.clip_by_value(KL_loss*KL_param + LL_loss, -100, 100)
-            loss = tf.clip_by_value(self.kl_div_loss_weight * mean_kl + ll_loss, -100, 100)
+            loss = self.kl_div_loss_weight * mean_kl + ll_loss
         #self._add_debug_op('loss', loss, False)
         
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
@@ -524,7 +525,7 @@ class VoxelVaegan():
                 logging.debug(msg)
         return
 
-    def _log_model_step_results(self, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time):
+    def _log_model_step_results(self, enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time):
         """
         Helper function for logging results from _model_step func
         
@@ -535,17 +536,19 @@ class VoxelVaegan():
         logging.info("Enc Loss = {:.2f}, ".format(enc_loss) + 
                      "KL Divergence = {:.2f}, ".format(kl) +
                      "Reconstruction Loss = {:.2f}, ".format(recon) +
+                     "ll_loss = {:.2f}, ".format(ll_loss) +
                      "dis_Loss = {:.2f}, ".format(dis_loss) +
                      "dec_Loss = {:.2f}, ".format(dec_loss) +
                      "Elapsed time: {:.2f} mins".format(elapsed_time))
         return
 
-    def _save_model_step_results(self, epoch, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time):
+    def _save_model_step_results(self, epoch, enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time):
         # save the epoch's data for review later
         self.metrics['epoch' + str(epoch)] = {
             'enc_loss': float(enc_loss),
             'kl_divergence': float(kl),
             'reconstruction_loss': float(recon),
+            'll_loss': float(ll_loss),
             'dis_loss': float(dis_loss),
             'dec_loss': float(dec_loss),
             'elapsed_time': float(elapsed_time) 
@@ -652,11 +655,9 @@ class VoxelVaegan():
   
         optim_ops = [self.enc_optim]
         exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon]
-        vaegan_optim_ops = optim_ops + [self.dec_optim, self.dis_optim]
-        vaegan_exec_ops = exec_ops + [self.dis_loss, self.dec_loss]
         if not self.no_gan:
             optim_ops += [self.dec_optim, self.dis_optim]
-            vaegan_exec_ops = exec_ops + [self.dis_loss, self.dec_loss]
+            exec_ops = exec_ops + [self.ll_loss, self.dis_loss, self.dec_loss]
         debug_ops = [op for name, op, _ in self._debug_ops]
         
         ### Begin Training ###
@@ -695,15 +696,16 @@ class VoxelVaegan():
                 if self.no_gan:
                     enc_loss, kl, recon = results
                     # we know these didn't run; set loss values for reporting purposes
+                    ll_loss = -999
                     dis_loss = -999
                     dec_loss = -999
                 else:
-                    enc_loss, kl, recon, dis_loss, dec_loss = results
+                    enc_loss, kl, recon, ll_loss, dis_loss, dec_loss = results
 
                 if self.verbose:
-                    self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+                    self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
 
-                self._save_model_step_results(epoch, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+                self._save_model_step_results(epoch, enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
 
             if (epoch + 1) % display_step == 0:
                 self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
@@ -726,11 +728,12 @@ class VoxelVaegan():
                     if self.no_gan:
                         enc_loss, kl, recon = results
                         # we know these didn't run; set loss values for reporting purposes
+                        ll_loss = -999
                         dis_loss = -999
                         dec_loss = -999
                     else:
                         enc_loss, kl, recon, dis_loss, dec_loss = results
-                    self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+                    self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
 
             ### Save Model Checkpoint ###
             if (epoch + 1) % save_step == 0:
@@ -752,11 +755,12 @@ class VoxelVaegan():
                     if self.no_gan:
                         enc_loss, kl, recon = results
                         # we know these didn't run; set loss values for reporting purposes
+                        ll_loss = -999
                         dis_loss = -999
                         dec_loss = -999
                     else:
-                        enc_loss, kl, recon, dis_loss, dec_loss = results
-                    self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+                        enc_loss, kl, recon, ll_loss, dis_loss, dec_loss = results
+                    self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
             
         return
     
