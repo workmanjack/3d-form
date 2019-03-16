@@ -75,7 +75,7 @@ class VoxelVaegan():
             self.dis_fake, self.dis_fake_logits = self._discriminator(self.decoder, self._trainable)
             
             self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.dis_real_logits, self.dis_fake_logits)
-            self.dec_loss, self.dec_optim = self._make_decoder_loss(self.dis_fake_logits)
+            self.dec_loss, self.dec_optim = self._make_decoder_loss(self.dis_fake)
     
         # Initializing the tensor flow variables
         init = tf.global_variables_initializer()
@@ -333,7 +333,7 @@ class VoxelVaegan():
             o = tf.nn.sigmoid(conv4)
             self._log_shape(conv4)
             self._log_shape(o)
-
+        
         return o, conv4
     
     def _get_vars_by_scope(self, scope):
@@ -347,18 +347,44 @@ class VoxelVaegan():
         return dec_loss, dec_optim
     
     def _make_discriminator_loss(self, dis_real_logits, dis_fake_logits):
-        self._add_debug_op('dis_real_logits', dis_real_logits, False)
-        dis_loss_real = tf.reduce_mean(dis_real_logits)
+        """
+        Thank you to https://github.com/uclaacmai/Generative-Adversarial-Network-Tutorial/blob/master/Generative%20Adversarial%20Networks%20Tutorial.ipynb
+        for clearing up confusion on GAN loss functions
+        """
+        # Discriminator Loss with Dataset Input
+        #self._add_debug_op('dis_real_logits', dis_real_logits, False)
+        #dis_loss_real = tf.reduce_mean(dis_real_logits)
+        dis_loss_real = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=dis_real_logits,
+                labels=tf.ones_like(dis_real_logits)
+            ))
         self._add_debug_op('dis_loss_real', dis_loss_real, False)
-        dis_loss_fake = tf.reduce_mean(dis_fake_logits)
+
+        # Discriminator Loss with VAE Generated Input
+        #self._add_debug_op('dis_fake_logits', dis_fake_logits, False)
+        #dis_loss_fake = tf.reduce_mean(dis_fake_logits)
+        dis_loss_fake = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=dis_fake_logits,
+                labels=tf.zeros_like(dis_fake_logits)
+            ))
         self._add_debug_op('dis_loss_fake', dis_loss_fake, False)
-        dis_loss = dis_loss_real - dis_loss_fake
+
+        # Combine Losses
+        dis_loss = dis_loss_real + dis_loss_fake
         self._add_debug_op('dis_loss', dis_loss, False)
+
+        # Optimizer
         # thank you: https://stackoverflow.com/questions/36533723/tensorflow-get-all-variables-in-scope
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
-        dis_optim = tf.train.RMSPropOptimizer(self._learning_rate).minimize(-dis_loss, var_list=var_list)
+        dis_optim = tf.train.RMSPropOptimizer(self._learning_rate).minimize(dis_loss, var_list=var_list)
+
+        # Summaries
+        tf.summary.scalar('dis_loss', dis_loss)
         tf.summary.scalar('dis_loss_real', dis_loss_real)
         tf.summary.scalar('dis_loss_fake', dis_loss_fake)
+        
         return dis_loss, dis_optim
     
     def _make_encoder_loss(self, enc_input, dec_output, z_mu, z_sig):
@@ -444,7 +470,7 @@ class VoxelVaegan():
         logging.info("Enc Loss = {:.2f}, ".format(enc_loss) + 
                      "KL Divergence = {:.2f}, ".format(kl) +
                      "Reconstruction Loss = {:.2f}, ".format(recon) +
-                     "-dis_Loss = {:.2f}, ".format(-dis_loss) +
+                     "dis_Loss = {:.2f}, ".format(dis_loss) +
                      "dec_Loss = {:.2f}, ".format(dec_loss) +
                      "Elapsed time: {:.2f} mins".format(elapsed_time))
         return
@@ -558,12 +584,14 @@ class VoxelVaegan():
         train_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'train'), self.sess.graph)
         dev_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'dev'), self.sess.graph)
         test_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'test'), self.sess.graph)
-
+  
         optim_ops = [self.enc_optim]
         exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon]
+        vaegan_optim_ops = optim_ops + [self.dec_optim, self.dis_optim]
+        vaegan_exec_ops = exec_ops + [self.dis_loss, self.dec_loss]
         if not self.no_gan:
             optim_ops += [self.dec_optim, self.dis_optim]
-            exec_ops += [self.dis_loss, self.dec_loss]
+            vaegan_exec_ops = exec_ops + [self.dis_loss, self.dec_loss]
         debug_ops = [op for name, op, _ in self._debug_ops]
         
         ### Begin Training ###
@@ -586,34 +614,31 @@ class VoxelVaegan():
 
                     logging.debug('Epoch: {} / {}, Batch: {} ({} / {}), Elapsed time: {:.2f} mins'.format(
                         epoch, epochs, batch_num, batch_progress, inputs, elapsed_time(start)))
-
-                # optional repeats for extra practice on each shape
-                for _ in range(input_repeats):
                     
-                    merge = tf.summary.merge_all()
-                    results = self._model_step(feed_dict={self._input_x: batch,
-                                                          self._keep_prob:self.keep_prob,
-                                                          self._learning_rate: learning_rate,
-                                                          self._trainable: True},
-                                               step=self.step,
-                                               summary_writer=train_writer,
-                                               summary_op=merge,
-                                               optim_ops=optim_ops,
-                                               exec_ops=exec_ops,
-                                               debug_ops=debug_ops)
-                    self.step += 1
-                    if self.no_gan:
-                        enc_loss, kl, recon = results
-                        # we know these didn't run; set loss values for reporting purposes
-                        dis_loss = -999
-                        dec_loss = -999
-                    else:
-                        enc_loss, kl, recon, dis_loss, dec_loss = results
-                    
-                    if self.verbose:
-                        self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+                merge = tf.summary.merge_all()
+                results = self._model_step(feed_dict={self._input_x: batch,
+                                                      self._keep_prob:self.keep_prob,
+                                                      self._learning_rate: learning_rate,
+                                                      self._trainable: True},
+                                           step=self.step,
+                                           summary_writer=train_writer,
+                                           summary_op=merge,
+                                           optim_ops=optim_ops,
+                                           exec_ops=exec_ops,
+                                           debug_ops=debug_ops)
+                self.step += 1
+                if self.no_gan:
+                    enc_loss, kl, recon = results
+                    # we know these didn't run; set loss values for reporting purposes
+                    dis_loss = -999
+                    dec_loss = -999
+                else:
+                    enc_loss, kl, recon, dis_loss, dec_loss = results
 
-                    self._save_model_step_results(epoch, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+                if self.verbose:
+                    self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+
+                self._save_model_step_results(epoch, enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
 
             if (epoch + 1) % display_step == 0:
                 self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
