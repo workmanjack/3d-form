@@ -73,7 +73,7 @@ def train_vaegan(cfg):
     # split
     splits = cfg.get('dataset').get('splits', None)
     generator_cfg = cfg.get('generator')
-    if dataset_class == 'Thingi10k' and splits:
+    if dataset_class == Thingi10k and splits:
         # splits only supported by Thingi10k
         logging.info('Splitting Datasets')
         thingi_train, thingi_dev, thingi_test = dataset.split(splits['train'], splits['test'])
@@ -86,7 +86,7 @@ def train_vaegan(cfg):
             batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
         test_generator = lambda: thingi_test.voxels_batchmaker(
             batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
-    elif dataset_class == 'ModelNet10' and splits:
+    elif dataset_class == ModelNet10 and splits:
         logging.info('Splitting Datasets')
         train_generator = lambda: dataset.voxels_batchmaker(
             batch_size=BATCH_SIZE, set_filter='train', voxels_dim=VOXELS_DIM,
@@ -143,7 +143,7 @@ def train_vaegan(cfg):
             # Use learning rate for set number of epochs
             # If set number is None, then continue for rest of total
             num_epochs = epochs if epochs is not None else int(cfg_model.get('epochs')) - count
-            
+
             vaegan.train(train_generator,
                          dev_generator,
                          test_generator,
@@ -155,13 +155,16 @@ def train_vaegan(cfg):
                          learning_rate=rate)
             
             count += num_epochs
+            
+        vaegan._save_model_ckpt('_end')
+        logging.info('Saved final checkpoint')
         
         try:
             ex.info['metrics'] = vaegan.metrics
             ex.info['model_dir'] = vaegan.ckpt_dir
         except:
             # fails if not running in an experiment... which is okay
-            print('Did not save experiment metrics')
+            logging.info('Did not save experiment metrics')
             pass
 
     except Exception as exc:
