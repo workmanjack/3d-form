@@ -138,8 +138,9 @@ def train_vaegan(cfg):
             lr = [(cfg_model.get('epochs'), lr)]
         if isinstance(lr, tuple):
              lr = [lr]
+                
         for epochs, rate in lr:
-            
+
             # Use learning rate for set number of epochs
             # If set number is None, then continue for rest of total
             num_epochs = epochs if epochs is not None else int(cfg_model.get('epochs')) - count
@@ -153,9 +154,9 @@ def train_vaegan(cfg):
                          save_step=cfg_model.get('save_step'),
                          dev_step=cfg_model.get('dev_step'),
                          learning_rate=rate)
-            
+
             count += num_epochs
-            
+        
         vaegan._save_model_ckpt('_end')
         logging.info('Saved final checkpoint')
         

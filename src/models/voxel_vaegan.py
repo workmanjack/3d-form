@@ -369,16 +369,17 @@ class VoxelVaegan():
         #dec_loss = -tf.reduce_mean(dis_fake_logits)
         
         # Loss
-        dec_loss = tf.reduce_mean(-1. * (tf.log(tf.clip_by_value(dec_random, 1e-5, 1.0))))
+        dec_random_loss = tf.reduce_mean(-1. * (tf.log(dec_random)))
         # TODO: see example code for how these weights are set and why
         self.ll_weight = 1
         self.dec_weight = 1
-        dec_loss = tf.clip_by_value(ll_loss * self.ll_weight + dec_loss * self.dec_weight, -100, 100)
+        dec_loss = ll_loss * self.ll_weight + dec_random_loss * self.dec_weight
         
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DECODER)
         dec_optim = tf.train.RMSPropOptimizer(self._learning_rate).minimize(dec_loss, var_list=var_list)
 
+        tf.summary.scalar("dec_random_loss", dec_random_loss) 
         tf.summary.scalar("dec_loss", dec_loss) 
         
         return dec_loss, dec_optim
@@ -386,14 +387,17 @@ class VoxelVaegan():
     def _make_ll_loss(self, dis_input_ll, dis_dec_ll):
         # Lth Layer Loss - the 'learned similarity measure'  
         ll_loss = tf.reduce_mean(tf.reduce_sum(tf.square(dis_input_ll - dis_dec_ll)))
+        tf.summary.scalar("ll_loss", ll_loss)
         return ll_loss
     
     def _make_discriminator_loss(self, dis_input_output, dis_dec_output):
         """
         """
-        dis_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(dis_input_output, 1e-5, 1.0)) + 
-                                    tf.log(tf.clip_by_value(1.0 - dis_dec_output, 1e-5, 1.0))))
-        dis_loss = tf.clip_by_value(dis_loss, -100, 100)
+        #dis_loss = tf.reduce_mean(-1.*(tf.log(dis_input_output) + 
+        #                            tf.log(1.0 - dis_dec_output)))
+        dis_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(dis_input_output,1e-5,1.0)) + 
+                                    tf.log(tf.clip_by_value(1.0 - dis_dec_output,1e-5,1.0))))
+        dis_loss = dis_loss
         
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
@@ -481,10 +485,8 @@ class VoxelVaegan():
         #recon_loss = tf.reduce_sum(tf.squared_difference(
         #    tf.reshape(dec_output, (-1, self.input_dim ** 3)),
         #    tf.reshape(self._input_x, (-1, self.input_dim ** 3))), 1)
-        #kl_divergence = -0.5 * tf.reduce_sum(1.0 + 2.0 * z_sig - z_mu ** 2 - tf.exp(2.0 * z_sig), 1)
-        kl_divergence = tf.reduce_sum(-0.5 * tf.reduce_sum(1 + tf.clip_by_value(z_sig, -10.0, 10.0) 
-                                   - tf.square(tf.clip_by_value(z_mu, -10.0, 10.0) ) 
-                                   - tf.exp(tf.clip_by_value(z_sig, -10.0, 10.0) ), 1))
+        kl_divergence = -0.5 * tf.reduce_sum(1.0 + 2.0 * z_sig - z_mu ** 2 - tf.exp(2.0 * z_sig), 1)
+        #kl_divergence = tf.reduce_sum(-0.5 * tf.reduce_sum(1 + z_sig) - tf.square(z_mu) - tf.exp(z_sig), 1)
         mean_kl = tf.reduce_mean(kl_divergence)
 
         #self._add_debug_op('mean_kl', mean_kl, False)
@@ -707,6 +709,10 @@ class VoxelVaegan():
 
                 self._save_model_step_results(epoch, enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
 
+            ### Save Model Checkpoint ###
+            if (epoch + 1) % save_step == 0:
+                self._save_model_ckpt(epoch)
+
             if (epoch + 1) % display_step == 0:
                 self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
                 if viz_data is not None:
@@ -732,12 +738,8 @@ class VoxelVaegan():
                         dis_loss = -999
                         dec_loss = -999
                     else:
-                        enc_loss, kl, recon, dis_loss, dec_loss = results
+                        enc_loss, kl, recon, ll_loss, dis_loss, dec_loss = results
                     self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
-
-            ### Save Model Checkpoint ###
-            if (epoch + 1) % save_step == 0:
-                self._save_model_ckpt(epoch)
                 
         ### Evaluate Test Dataset ###
         if test_generator:
