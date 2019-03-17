@@ -472,6 +472,30 @@ class Thingi10k(IndexedDataset):
                 yield np.asarray(batch)
         return
     
+	
+	def voxels_batchmaker_2(self, batch_size, voxels_dim, verbose=False):
+		# generate a pair of files for mashup
+        batch_1 = list()
+        batch_2 = list()
+        for i, stl_file in enumerate(self.df.stl_file):
+            vox_data = self.get_voxels(voxels_dim, stl_file=stl_file, shape=[voxels_dim, voxels_dim, voxels_dim, 1])
+            if vox_data is None:
+                continue
+            # each element has 1 "channel" aka data point (if RGB color, it would be 3)
+
+            if len(batch_1) < batch_size:
+                batch_1.append(vox_data)
+            elif len(batch_2) < batch_size:
+                batch_2.append(vox_data)
+            # yield batch if ready; else continue
+            if (i+1) % (batch_size *2) == 0:
+                yield np.asarray((batch_1, batch_2))
+                batch_1 = list()
+                batch_2 = list()
+        return
+	
+	
+	
     def split(self, train_split, test_size):
         """
         Assumes that you want dev & test to be the same size
