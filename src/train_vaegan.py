@@ -133,10 +133,10 @@ def train_vaegan(cfg):
             tb_proc = subprocess.Popen(tb_cmd, stdout=subprocess.PIPE)
 
         count = 0
-        lr = cfg_model.get('learning_rate')
+        lr = cfg_model.get('learning_rate', None)
         if not isinstance(lr, list):
             lr = [(cfg_model.get('epochs'), lr)]
-        if isinstance(lr, tuple):
+        elif isinstance(lr, tuple):
              lr = [lr]
                 
         for epochs, rate in lr:
@@ -153,7 +153,9 @@ def train_vaegan(cfg):
                          display_step=cfg_model.get('display_step'),
                          save_step=cfg_model.get('save_step'),
                          dev_step=cfg_model.get('dev_step'),
-                         learning_rate=rate)
+                         enc_lr=cfg_model.get('enc_lr'),
+                         dec_lr=cfg_model.get('dec_lr'),
+                         dis_lr=cfg_model.get('dis_lr'))
 
             count += num_epochs
         
