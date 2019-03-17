@@ -135,9 +135,6 @@ class VoxelVaegan():
             logging.debug('{}: {}'.format(name, tensor.shape))
         return
     
-    def _random_latent(self):
-        return tf.random_normal(tf.stack([self._batch_size, self.latent_dim]))
-    
     def _make_encoder(self, input_x, keep_prob, trainable):
         
         with tf.variable_scope(self.SCOPE_ENCODER, reuse=tf.AUTO_REUSE):
@@ -813,9 +810,6 @@ class VoxelVaegan():
             
         return
     
-    def test(self, ):
-        return
-
     def restore(self, model_ckpt):
         self.saver.restore(self.sess, model_ckpt)
         return
@@ -836,6 +830,31 @@ class VoxelVaegan():
         decoded = results[0]
         self._log_debug_ops(results[1:])
                     
+        return decoded
+    
+    def _random_latent(self):
+        return tf.random_normal(tf.stack([self._batch_size, self.latent_dim]))
+
+    def random_latent_vector(self):
+        """
+        Create a latent vector for vaegan
+        """
+        latent_vector = self.sess.run(vaegan._random_latent())
+        return latent_vector
+
+    def latent_recon(self, latent_vector):
+        """
+        Decode an object from the provided latent vector
+        """
+        
+        ops = tuple([self.decoder] + [op for name, op, _ in self._debug_ops])
+
+        results = self.sess.run(self.decoder, 
+            feed_dict={self.encoder: latent_vector, self._trainable: False})
+        
+        decoded = results[0]
+        self._log_debug_ops(results[1:])
+
         return decoded
     
     def visualize_reconstruction(self, original_x, reconstructed_x, name=None):
