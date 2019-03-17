@@ -80,8 +80,9 @@ class ModelNet10(IndexedDataset):
         
     def get_random_voxels(self, voxels_dim):
         random_sample = self.df.sample(n=1).iloc[0]
+        filename = random_sample['binvox']
         voxels = self.get_voxels(random_sample['category'], random_sample['dataset'], random_sample['binvox'])
-        return voxels
+        return filename, voxels
 
     def get_voxels(self, category, dataset, voxel_file, verbose=False, shape=None):
         # construct path
