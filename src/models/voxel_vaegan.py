@@ -1,5 +1,5 @@
 # project imports
-from utils import elapsed_time
+from utils import elapsed_time, memory
 
 
 # python & package imports
@@ -676,6 +676,11 @@ class VoxelVaegan():
         train_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'train'), self.sess.graph)
         dev_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'dev'), self.sess.graph)
         test_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'test'), self.sess.graph)
+        merge = tf.summary.merge_all()
+
+        # https://riptutorial.com/tensorflow/example/13426/use-graph-finalize---to-catch-nodes-being-added-to-the-graph
+
+        self.sess.graph.finalize()  # Graph is read-only after this statement.
 
         optim_ops = [self.enc_optim]
         exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon]
@@ -715,7 +720,6 @@ class VoxelVaegan():
                 dec_current_lr = dec_lr * self.sigmoid(np.mean(d_real), -.5, 15)
                 dis_current_lr = dis_lr * self.sigmoid(np.mean(d_fake), -.5, 15)
 
-                merge = tf.summary.merge_all()
                 results = self._model_step(feed_dict={self._input_x: batch,
                                                       self._keep_prob:self.keep_prob,
                                                       self._trainable: True,
@@ -740,6 +744,8 @@ class VoxelVaegan():
 
                 if self.verbose:
                     self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
+                    
+                logging.info('Memory Use (GB): {}'.format(memory()))
 
             self._save_model_step_results(epoch, enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
 
@@ -758,7 +764,7 @@ class VoxelVaegan():
                 
                 for batch_num, batch in enumerate(dev_generator()):
                     
-                    merge = tf.summary.merge_all()
+                    #merge = tf.summary.merge_all()
                     results = self._model_step(
                        feed_dict={self._input_x: batch,
                                   self._keep_prob:self.keep_prob,
@@ -786,7 +792,7 @@ class VoxelVaegan():
 
             for batch_num, batch in enumerate(test_generator()):
                     
-                    merge = tf.summary.merge_all()
+                    #merge = tf.summary.merge_all()
                     results = self._model_step(
                        feed_dict={self._input_x: batch,
                                   self._keep_prob:self.keep_prob,

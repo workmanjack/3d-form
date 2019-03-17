@@ -1,5 +1,5 @@
 # project imports
-from utils import get_logger, read_json_data
+from utils import get_logger, read_json_data, memory
 from models.voxel_vaegan import VoxelVaegan
 from data.thingi10k import Thingi10k
 from data.modelnet10 import ModelNet10
@@ -157,6 +157,9 @@ def train_vaegan(cfg):
                          dec_lr=cfg_model.get('dec_lr'),
                          dis_lr=cfg_model.get('dis_lr'))
 
+            if cfg_model.get('memory_monitor', False):
+                logging.info('Memory Use (GB): {}'.format(memory()))
+            
             count += num_epochs
         
         vaegan._save_model_ckpt('_end')

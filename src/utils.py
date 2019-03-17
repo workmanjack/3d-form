@@ -3,6 +3,7 @@ import collections
 import subprocess
 import requests
 import datetime
+import psutil
 import time
 import json
 import os
@@ -200,4 +201,10 @@ def retrieve_ckpt_dir_from_legacy_sacred_cfg(root):
     if found:
         return cfg_path, ckpt_dir
 
+    
+def memory():
+    pid = os.getpid()
+    py = psutil.Process(pid)
+    memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
+    return memoryUse
             
