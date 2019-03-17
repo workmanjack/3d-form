@@ -167,4 +167,37 @@ def flatten_dict(d, parent_key='', sep='/'):
         else:
             items.append((new_key, v))
     return dict(items)
+
+
+def retrieve_ckpt_dir_from_legacy_sacred_cfg(root):
+    """
+    Just in case you need to retrieve a ckpt_dir from an old sacred config.json save
+    
+    Args:
+        root: str, path to dir with sacred experiments
+        
+    Returns:
+        cfg_path: str, path to sacred config
+        ckpt_dir: str, path to dir housing model ckpts of config
+    """
+    cfg_path = None
+    ckpt_dir = None
+    found = False
+    for exp_dir in os.listdir(root):
+        if exp_dir == '_sources':
+            continue
+        #print('-------')
+        #print(exp_dir)
+        cfg_path = os.path.join(root, exp_dir + '/config.json')
+        with open(cfg_path, 'r') as json_file:
+            cfg = json.load(json_file)
+        ckpt_dir = cfg.get('cfg', 'banana').get('model', 'apple').get('ckpt_dir', 'orange')
+        #print(ckpt_dir)
+        if '2019-03-12_16-36-25' in ckpt_dir:
+            print('found it!')
+            found = True
+            break
+    if found:
+        return cfg_path, ckpt_dir
+
             
