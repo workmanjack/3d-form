@@ -680,7 +680,7 @@ class VoxelVaegan():
 
         # https://riptutorial.com/tensorflow/example/13426/use-graph-finalize---to-catch-nodes-being-added-to-the-graph
 
-        self.sess.graph.finalize()  # Graph is read-only after this statement.
+        #self.sess.graph.finalize()  # Graph is read-only after this statement.
 
         optim_ops = [self.enc_optim]
         exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon]
@@ -719,7 +719,13 @@ class VoxelVaegan():
                 enc_current_lr = enc_lr * self.sigmoid(np.mean(d_real), -.5, 15)
                 dec_current_lr = dec_lr * self.sigmoid(np.mean(d_real), -.5, 15)
                 dis_current_lr = dis_lr * self.sigmoid(np.mean(d_fake), -.5, 15)
+                print('np.mean(d_real): ', np.mean(d_real))
+                print('np.mean(d_fake): ', np.mean(d_fake))
+                print('enc_current_lr: ', enc_current_lr)
+                print('dec_current_lr: ', dec_current_lr)
+                print('dis_current_lr: ', dis_current_lr)
 
+                #merge = tf.summary.merge_all()
                 results = self._model_step(feed_dict={self._input_x: batch,
                                                       self._keep_prob:self.keep_prob,
                                                       self._trainable: True,
@@ -754,7 +760,7 @@ class VoxelVaegan():
                 self._save_model_ckpt(epoch)
 
             if (epoch + 1) % display_step == 0:
-                self._log_model_step_results(enc_loss, kl, recon, dis_loss, dec_loss, elapsed_time(start))
+                self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
                 if viz_data is not None:
                     self._train_recon_example(epoch, viz_data)
 
@@ -767,8 +773,8 @@ class VoxelVaegan():
                     #merge = tf.summary.merge_all()
                     results = self._model_step(
                        feed_dict={self._input_x: batch,
-                                  self._keep_prob:self.keep_prob,
-                                  self._trainable: True,
+                                  self._keep_prob: 1.0,
+                                  self._trainable: False,
                                   self._lr_enc: enc_current_lr,
                                   self._lr_dec: dec_current_lr,
                                   self._lr_dis: dis_current_lr,},
@@ -795,8 +801,8 @@ class VoxelVaegan():
                     #merge = tf.summary.merge_all()
                     results = self._model_step(
                        feed_dict={self._input_x: batch,
-                                  self._keep_prob:self.keep_prob,
-                                  self._trainable: True,
+                                  self._keep_prob: 1.0,
+                                  self._trainable: False,
                                   self._lr_enc: enc_current_lr,
                                   self._lr_dec: dec_current_lr,
                                   self._lr_dis: dis_current_lr,},
