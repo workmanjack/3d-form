@@ -148,7 +148,7 @@ class VoxelVaegan():
                                      kernel_size=[3, 3, 3],
                                      strides=(1, 1, 1),
                                      padding='valid',
-                                     activation=tf.nn.elu,
+                                     activation=tf.nn.relu,
                                      kernel_initializer=tf.initializers.glorot_uniform()),
                                      name='enc_conv1')
             self._log_shape(conv1)
@@ -169,7 +169,7 @@ class VoxelVaegan():
                                      kernel_size=[3, 3, 3],
                                      strides=(2, 2, 2),
                                      padding='same',
-                                     activation=tf.nn.elu,
+                                     activation=tf.nn.relu,
                                      kernel_initializer=tf.initializers.glorot_uniform()))
             self._log_shape(conv2)
 
@@ -178,7 +178,7 @@ class VoxelVaegan():
                                      kernel_size=[3, 3, 3],
                                      strides=(1, 1, 1),
                                      padding='valid',
-                                     activation=tf.nn.elu,
+                                     activation=tf.nn.relu,
                                      kernel_initializer=tf.initializers.glorot_uniform()))
             self._log_shape(conv3)
 
@@ -187,7 +187,7 @@ class VoxelVaegan():
                                      kernel_size=[3, 3, 3],
                                      strides=(2, 2, 2),
                                      padding='same',
-                                     activation=tf.nn.elu,
+                                     activation=tf.nn.relu,
                                      kernel_initializer=tf.initializers.glorot_uniform()))
             self._log_shape(conv4)
 
@@ -259,7 +259,7 @@ class VoxelVaegan():
                                                kernel_size=[3, 3, 3],
                                                strides=(1, 1, 1),
                                                padding='same',
-                                               activation=tf.nn.elu,
+                                               activation=tf.nn.relu,
                                                use_bias=False,
                                                kernel_initializer=tf.initializers.glorot_uniform(),
                                                name='dec_conv1'))
@@ -270,7 +270,7 @@ class VoxelVaegan():
                                                kernel_size=[3, 3, 3],
                                                strides=(2, 2, 2),
                                                padding='valid',
-                                               activation=tf.nn.elu,
+                                               activation=tf.nn.relu,
                                                use_bias=False,
                                                kernel_initializer=tf.initializers.glorot_uniform(),
                                                name='dec_conv2'))
@@ -281,7 +281,7 @@ class VoxelVaegan():
                                                kernel_size=[3, 3, 3],
                                                strides=(1, 1, 1),
                                                padding='same',
-                                               activation=tf.nn.elu,
+                                               activation=tf.nn.relu,
                                                use_bias=False,
                                                kernel_initializer=tf.initializers.glorot_uniform(),
                                                name='dec_conv3'))
@@ -292,7 +292,7 @@ class VoxelVaegan():
                                                kernel_size=[4, 4, 4],
                                                strides=(2, 2, 2),
                                                padding='valid',
-                                               activation=tf.nn.elu,
+                                               activation=tf.nn.relu,
                                                use_bias=False,
                                                kernel_initializer=tf.initializers.glorot_uniform(),
                                                name='dec_conv4'))
@@ -310,7 +310,7 @@ class VoxelVaegan():
                                                name='dec_conv5')
             self._log_shape(conv5)
 
-            decoded_output = tf.nn.sigmoid(conv5)
+            decoded_output = tf.nn.tanh(conv5)
             #decoded_output = tf.clip_by_value(decoded_output, 1e-7, 1.0 - 1e-7)
             tf.summary.scalar('max_decoded_output', tf.math.reduce_max(decoded_output), family='decoder_{}'.format(name))
             tf.summary.scalar('min_decoded_output', tf.math.reduce_min(decoded_output), family='decoder_{}'.format(name))
