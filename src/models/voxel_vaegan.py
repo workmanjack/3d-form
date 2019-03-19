@@ -203,13 +203,13 @@ class VoxelVaegan():
             flatten = tf.layers.flatten(tf.nn.dropout(dense1, keep_prob))
 
             # Calculate outputs
-            enc_mu = tf.layers.batch_normalization(tf.layers.dense(flatten,
+            enc_mu = tf.layers.dense(flatten,
                                  units=self.latent_dim,
-                                 activation=None))
+                                 activation=None)
             self._log_shape(enc_mu)
-            enc_sig = tf.layers.batch_normalization(tf.layers.dense(flatten,
+            enc_sig = tf.layers.dense(flatten,
                                  units=self.latent_dim,
-                                 activation=None))
+                                 activation=None)
             self._log_shape(enc_sig)
             
             # epsilon is a random draw from the latent space
@@ -298,6 +298,8 @@ class VoxelVaegan():
                                                name='dec_conv4'))
             self._log_shape(conv4)
 
+            # do not use batch norm in final decoder layer for stability according to learnings from
+            # https://arxiv.org/pdf/1511.06434.pdf
             conv5 = tf.layers.conv3d_transpose(conv4,
                                                filters=1,
                                                kernel_size=[3, 3, 3],
@@ -328,6 +330,8 @@ class VoxelVaegan():
             self._log_shape(input_x, 'input_x')
 
             # 1st hidden layer
+            # do not use batch norm to increase stability as instructed in
+            # https://arxiv.org/pdf/1511.06434.pdf
             conv1 = tf.layers.conv3d(input_x, 128, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
             lrelu1 = tf.nn.elu(conv1)
