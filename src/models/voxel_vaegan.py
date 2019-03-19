@@ -74,7 +74,7 @@ class VoxelVaegan():
         
         # Construct the TensorFlow Graph
         self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x, self._keep_prob, self._trainable)
-        self.decoder = self._make_decoder(self.encoder, self._trainable)
+        self.decoder = self._make_decoder(self.encoder, self._trainable, name='real')
 
         if self.no_gan:
             logging.info('Running VAE-GAN in VAE-Only Mode')
@@ -82,11 +82,11 @@ class VoxelVaegan():
                                                                            self.enc_mu, self.enc_sig)
 
         else:
-            self.dec_random = self._make_decoder(self._random_latent(), self._trainable)
+            self.dec_random = self._make_decoder(self._random_latent(), self._trainable, name='fake')
             self.dis_input_output, self.dis_input_ll = self._discriminator(self._input_x, self._trainable)
-            tf.summary.scalar('dis_input_output', self.dis_input_output)
+            tf.summary.scalar('dis_input_output', tf.reduce_mean(self.dis_input_output))
             self.dis_dec_output, self.dis_dec_ll = self._discriminator(self.dec_random, self._trainable)
-            tf.summary.scalar('dis_dec_output', self.dis_dec_output)
+            tf.summary.scalar('dis_dec_output', tf.reduce_mean(self.dis_dec_output))
             
             self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.dis_input_output, self.dis_dec_output)
             
@@ -211,17 +211,22 @@ class VoxelVaegan():
                                  units=self.latent_dim,
                                  activation=None))
             self._log_shape(enc_sig)
-
+            
             # epsilon is a random draw from the latent space
             self._batch_size = tf.shape(dense1)[0]
             epsilon = self._random_latent()
             self._log_shape(epsilon, 'epsilon')
+            enc_z = tf.add(enc_mu, tf.mul(tf.sqrt(tf.exp(enc_sig)), epsilon))
             enc_z = enc_mu + tf.multiply(epsilon, tf.exp(enc_sig))
             self._log_shape(enc_z, 'z')
 
+            tf.summary.scalar('enc_sig', tf.reduce_mean(enc_sig))
+            tf.summary.scalar('enc_mu', tf.reduce_mean(enc_mu))
+            tf.summary.scalar('enc_z', tf.reduce_mean(enc_z))
+            
         return enc_z, enc_mu, enc_sig
 
-    def _make_decoder(self, input_z, trainable):
+    def _make_decoder(self, input_z, trainable, name):
         
         with tf.variable_scope(self.SCOPE_DECODER, reuse=tf.AUTO_REUSE):
 
@@ -305,9 +310,9 @@ class VoxelVaegan():
 
             decoded_output = tf.nn.sigmoid(conv5)
             #decoded_output = tf.clip_by_value(decoded_output, 1e-7, 1.0 - 1e-7)
-            tf.summary.scalar('max_decoded_output', tf.math.reduce_max(decoded_output))
-            tf.summary.scalar('min_decoded_output', tf.math.reduce_min(decoded_output))
-            tf.summary.scalar('mean_decoded_output', tf.math.reduce_mean(decoded_output))
+            tf.summary.scalar('max_decoded_output', tf.math.reduce_max(decoded_output), family='decoder_{}'.format(name))
+            tf.summary.scalar('min_decoded_output', tf.math.reduce_min(decoded_output), family='decoder_{}'.format(name))
+            tf.summary.scalar('mean_decoded_output', tf.math.reduce_mean(decoded_output), family='decoder_{}'.format(name))
             self._log_shape(decoded_output)
 
         return decoded_output
@@ -407,48 +412,6 @@ class VoxelVaegan():
         tf.summary.scalar('dis_loss', dis_loss)
 
         return dis_loss, dis_optim
-
-        ###
-        # The below is based on
-        # https://github.com/uclaacmai/Generative-Adversarial-Network-Tutorial/blob/master/Generative%20Adversarial%20Networks%20Tutorial.ipynb
-        # it is for gans; we replaced it with the vaegan version above
-        ###
-        
-        # Discriminator Loss with Dataset Input
-        #self._add_debug_op('dis_real_logits', dis_real_logits, False)
-        #dis_loss_real = tf.reduce_mean(dis_real_logits)
-        dis_loss_real = tf.reduce_mean(
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=dis_real_logits,
-                labels=tf.ones_like(dis_real_logits)
-            ))
-        self._add_debug_op('dis_loss_real', dis_loss_real, False)
-
-        # Discriminator Loss with VAE Generated Input
-        #self._add_debug_op('dis_fake_logits', dis_fake_logits, False)
-        #dis_loss_fake = tf.reduce_mean(dis_fake_logits)
-        dis_loss_fake = tf.reduce_mean(
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=dis_fake_logits,
-                labels=tf.zeros_like(dis_fake_logits)
-            ))
-        self._add_debug_op('dis_loss_fake', dis_loss_fake, False)
-
-        # Combine Losses
-        dis_loss = dis_loss_real + dis_loss_fake
-        self._add_debug_op('dis_loss', dis_loss, False)
-
-        # Optimizer
-        # thank you: https://stackoverflow.com/questions/36533723/tensorflow-get-all-variables-in-scope
-        var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
-        dis_optim = tf.train.RMSPropOptimizer(self._lr_dis).minimize(dis_loss, var_list=var_list)
-
-        # Summaries
-        tf.summary.scalar('dis_loss', dis_loss)
-        tf.summary.scalar('dis_loss_real', dis_loss_real)
-        tf.summary.scalar('dis_loss_fake', dis_loss_fake)
-
-        return dis_loss, dis_optim
     
     def _make_encoder_loss(self, enc_input, dec_output, z_mu, z_sig, ll_loss=None):
         """
@@ -478,11 +441,12 @@ class VoxelVaegan():
         #recon_loss = tf.reduce_sum(tf.squared_difference(
         #    tf.reshape(dec_output, (-1, self.input_dim ** 3)),
         #    tf.reshape(self._input_x, (-1, self.input_dim ** 3))), 1)
+        
+        # the best description of kl divergence for VAEs:
+        # https://blog.fastforwardlabs.com/2016/08/22/under-the-hood-of-the-variational-autoencoder-in.html
         kl_divergence = -0.5 * tf.reduce_sum(1.0 + 2.0 * z_sig - z_mu ** 2 - tf.exp(2.0 * z_sig), 1)
         #kl_divergence = tf.reduce_sum(-0.5 * tf.reduce_sum(1 + z_sig) - tf.square(z_mu) - tf.exp(z_sig), 1)
         mean_kl = tf.reduce_mean(kl_divergence)
-
-        #self._add_debug_op('mean_kl', mean_kl, False)
 
         # tf reduce_mean: https://www.tensorflow.org/api_docs/python/tf/math/reduce_mean
         if self.no_gan:
