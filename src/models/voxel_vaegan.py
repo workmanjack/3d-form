@@ -84,7 +84,9 @@ class VoxelVaegan():
         else:
             self.dec_random = self._make_decoder(self._random_latent(), self._trainable)
             self.dis_input_output, self.dis_input_ll = self._discriminator(self._input_x, self._trainable)
+            tf.summary.scalar('dis_input_output', self.dis_input_output)
             self.dis_dec_output, self.dis_dec_ll = self._discriminator(self.dec_random, self._trainable)
+            tf.summary.scalar('dis_dec_output', self.dis_dec_output)
             
             self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.dis_input_output, self.dis_dec_output)
             
@@ -244,7 +246,6 @@ class VoxelVaegan():
             lrelu1 = tf.nn.elu(tf.layers.batch_normalization(dense1, training=trainable))
             self._log_shape(lrelu1)
 
-            #z = tf.reshape(z, (-1, 1, 1, 1, n_latent))
             reshape_z = tf.reshape(lrelu1, shape=(-1, 7, 7, 7, 1), name='reshape_z')
             self._log_shape(reshape_z)
 
@@ -254,7 +255,6 @@ class VoxelVaegan():
                                                strides=(1, 1, 1),
                                                padding='same',
                                                activation=tf.nn.elu,
-                                               # Example VAE does not mention bias
                                                use_bias=False,
                                                kernel_initializer=tf.initializers.glorot_uniform(),
                                                name='dec_conv1'))
@@ -263,9 +263,6 @@ class VoxelVaegan():
             conv2 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv1,
                                                filters=32,
                                                kernel_size=[3, 3, 3],
-                                               # Example VAE used .5 stride values, but Tensorflow complains
-                                               # of being forced to use a float value here
-                                               #strides=(1.0 / 2, 1.0 / 2, 1.0 / 2),
                                                strides=(2, 2, 2),
                                                padding='valid',
                                                activation=tf.nn.elu,
@@ -278,7 +275,6 @@ class VoxelVaegan():
                                                filters=16,
                                                kernel_size=[3, 3, 3],
                                                strides=(1, 1, 1),
-                                               # changed to valid to hit correct dimension
                                                padding='same',
                                                activation=tf.nn.elu,
                                                use_bias=False,
@@ -289,7 +285,6 @@ class VoxelVaegan():
             conv4 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv3,
                                                filters=8,
                                                kernel_size=[4, 4, 4],
-                                               #strides=(1.0 / 2, 1.0 / 2, 1.0 / 2),
                                                strides=(2, 2, 2),
                                                padding='valid',
                                                activation=tf.nn.elu,
@@ -310,9 +305,9 @@ class VoxelVaegan():
 
             decoded_output = tf.nn.sigmoid(conv5)
             #decoded_output = tf.clip_by_value(decoded_output, 1e-7, 1.0 - 1e-7)
-            #self._add_debug_op('max decoded_output', tf.math.reduce_max(decoded_output), False)
-            #self._add_debug_op('min decoded_output', tf.math.reduce_min(decoded_output), False)
-            #self._add_debug_op('mean decoded_output', tf.math.reduce_mean(decoded_output), False)
+            tf.summary.scalar('max_decoded_output', tf.math.reduce_max(decoded_output))
+            tf.summary.scalar('min_decoded_output', tf.math.reduce_min(decoded_output))
+            tf.summary.scalar('mean_decoded_output', tf.math.reduce_mean(decoded_output))
             self._log_shape(decoded_output)
 
         return decoded_output
@@ -346,8 +341,6 @@ class VoxelVaegan():
             self._log_shape(lrelu3)
             
             # output layer
-            #conv4 = tf.layers.conv3d(lrelu3, 1, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
-            #                          kernel_initializer=tf.contrib.layers.xavier_initializer())
             conv4 = tf.layers.conv3d(lrelu3, 1, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
             self._log_shape(conv4)
@@ -382,11 +375,6 @@ class VoxelVaegan():
         dec_random_loss = tf.reduce_mean(-1. * (tf.log(dec_random)))
         dec_loss = ll_loss * self.ll_weight + dec_random_loss * self.dec_weight
 
-        #self._add_debug_op('ll_loss', ll_loss, False)
-        #self._add_debug_op('dec_random_loss', dec_random_loss, False)
-        #self._add_debug_op('ll_loss weighted', ll_loss * self.ll_weight, False)
-        #self._add_debug_op('dec_random_loss weighted', dec_random_loss * self.dec_weight, False)        
-        
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DECODER)
         dec_optim = tf.train.RMSPropOptimizer(self._lr_dec).minimize(dec_loss, var_list=var_list)
@@ -479,21 +467,14 @@ class VoxelVaegan():
         # we must clip because values of 0 or 1 will cause errors
         clipped_input = tf.clip_by_value(enc_input, 1e-7, 1.0 - 1e-7)
         clipped_output = tf.clip_by_value(dec_output, 1e-7, 1.0 - 1e-7)
-        #self._add_debug_op('max clipped_input', tf.math.reduce_max(clipped_input), False)
-        #self._add_debug_op('min clipped_input', tf.math.reduce_min(clipped_input), False)
-        #self._add_debug_op('mean clipped_input', tf.math.reduce_mean(clipped_input), False)
-        #self._add_debug_op('max clipped_output', tf.math.reduce_max(clipped_output), False)
-        #self._add_debug_op('min clipped_output', tf.math.reduce_min(clipped_output), False)
-        #self._add_debug_op('mean clipped_output', tf.math.reduce_mean(clipped_output), False)
         bce = -(98.0 * clipped_input * tf.log(clipped_output) + 2.0 * (1.0 - clipped_input) * tf.log(1.0 - clipped_output)) / 100.0
-        #self._add_debug_op('bce', bce, False)
-        #bce = tf.keras.backend.binary_crossentropy(enc_output, dec_output)
         
         # Voxel-Wise Reconstruction Loss 
         # Note that the output values are clipped to prevent the BCE from evaluating log(0).
         recon_loss = tf.reduce_mean(bce, 1)
         mean_recon = tf.reduce_mean(recon_loss)
    
+        # original recon_loss mean squared error measurement:
         #recon_loss = tf.reduce_sum(tf.squared_difference(
         #    tf.reshape(dec_output, (-1, self.input_dim ** 3)),
         #    tf.reshape(self._input_x, (-1, self.input_dim ** 3))), 1)
@@ -511,11 +492,7 @@ class VoxelVaegan():
             # otherwise, we use the discriminator's input
             #L_e = tf.clip_by_value(KL_loss*KL_param + LL_loss, -100, 100)
             loss = self.kl_div_loss_weight * mean_kl + ll_loss * self.ll_weight
-            #self._add_debug_op('mean_kl', mean_kl, False)
-            #self._add_debug_op('mean_kl weighted', self.kl_div_loss_weight * mean_kl, False)
 
-        #self._add_debug_op('loss', loss, False)
-        
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
         if self.no_gan:
             # if no gan, we'll want this optimizer to update the decoder network's weights, too
@@ -689,6 +666,9 @@ class VoxelVaegan():
             exec_ops = exec_ops + [self.ll_loss, self.dis_loss, self.dec_loss]
         debug_ops = [op for name, op, _ in self._debug_ops]
         
+        d_real = .5
+        d_fake = .5
+
         ### Begin Training ###
 
         inputs = 0
@@ -711,19 +691,9 @@ class VoxelVaegan():
                         epoch, epochs, batch_num, batch_progress, inputs, elapsed_time(start)))
                 
                 # adaptive learning rate
-                #d_real = self.dis_input_output
-                #d_fake = self.dis_dec_output
-                if epoch == 0 and batch_num == 0:
-                    d_real = 0
-                    d_fake = 0
                 enc_current_lr = enc_lr * self.sigmoid(np.mean(d_real), -.5, 15)
                 dec_current_lr = dec_lr * self.sigmoid(np.mean(d_real), -.5, 15)
                 dis_current_lr = dis_lr * self.sigmoid(np.mean(d_fake), -.5, 15)
-                print('np.mean(d_real): ', np.mean(d_real))
-                print('np.mean(d_fake): ', np.mean(d_fake))
-                print('enc_current_lr: ', enc_current_lr)
-                print('dec_current_lr: ', dec_current_lr)
-                print('dis_current_lr: ', dis_current_lr)
 
                 #merge = tf.summary.merge_all()
                 results = self._model_step(feed_dict={self._input_x: batch,
