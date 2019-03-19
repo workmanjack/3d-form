@@ -9,6 +9,7 @@ import urllib.request
 import pandas as pd
 import numpy as np
 import traceback
+import random
 import shutil
 import json
 import time
@@ -79,9 +80,10 @@ class ModelNet10(IndexedDataset):
         super().__init__(df, index, pctile)
         
     def get_random_voxels(self, voxels_dim):
-        random_sample = self.df.sample(n=1).iloc[0]
-        filename = random_sample['binvox']
-        voxels = self.get_voxels(random_sample['category'], random_sample['dataset'], random_sample['binvox'])
+        random_sample = self.df.iloc[random.sample(list(self.df.index), 1)]
+        #random_sample = self.df.sample(n=1).iloc[0]
+        filename = random_sample['binvox'].iloc[0]
+        voxels = self.get_voxels(random_sample['category'].iloc[0], random_sample['dataset'].iloc[0], filename)
         return filename, voxels
 
     def get_voxels(self, category, dataset, voxel_file, verbose=False, shape=None):

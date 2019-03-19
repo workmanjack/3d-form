@@ -851,7 +851,7 @@ class VoxelVaegan():
         """
         Create a latent vector for vaegan
         """
-        latent_vector = self.sess.run(vaegan._random_latent())
+        latent_vector = tf.Session().run(self._random_latent())
         return latent_vector
 
     def latent_recon(self, latent_vector):
