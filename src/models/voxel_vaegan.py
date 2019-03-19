@@ -334,19 +334,19 @@ class VoxelVaegan():
             # https://arxiv.org/pdf/1511.06434.pdf
             conv1 = tf.layers.conv3d(input_x, 128, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
-            lrelu1 = tf.nn.elu(conv1)
+            lrelu1 = tf.nn.leaky_relu(conv1)
             self._log_shape(lrelu1)
 
             # 2nd hidden layer
             conv2 = tf.layers.conv3d(lrelu1, 256, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            lrelu2 = tf.nn.elu(tf.layers.batch_normalization(conv2, training=trainable))
+            lrelu2 = tf.nn.leaky_relu(tf.layers.batch_normalization(conv2, training=trainable))
             self._log_shape(lrelu2)
 
             # 3rd hidden layer
             conv3 = tf.layers.conv3d(lrelu2, 512, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            lrelu3 = tf.nn.elu(tf.layers.batch_normalization(conv3, training=trainable))
+            lrelu3 = tf.nn.leaky_relu(tf.layers.batch_normalization(conv3, training=trainable))
             self._log_shape(lrelu3)
             
             # output layer
@@ -361,7 +361,7 @@ class VoxelVaegan():
                                         units=1024,
                                         kernel_initializer=tf.initializers.glorot_uniform(),
                                         name='lth_layer')
-            lth_relu = tf.nn.elu(tf.layers.batch_normalization(lth_layer, training=trainable))
+            lth_relu = tf.nn.leaky_relu(tf.layers.batch_normalization(lth_layer, training=trainable))
             self._log_shape(lth_relu)
             
             D = tf.layers.dense(lth_relu,
