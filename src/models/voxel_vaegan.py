@@ -386,7 +386,8 @@ class VoxelVaegan():
 
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DECODER)
-        dec_optim = tf.train.RMSPropOptimizer(self._lr_dec).minimize(dec_loss, var_list=var_list)
+        # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
+        dec_optim = tf.train.AdamOptimizer(learning_rate=self._lr_dec, beta1=0.5).minimize(dec_loss, var_list=var_list)
 
         tf.summary.scalar("dec_random_loss", dec_random_loss) 
         tf.summary.scalar("dec_loss", dec_loss) 
@@ -410,7 +411,8 @@ class VoxelVaegan():
         
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
-        dis_optim = tf.train.RMSPropOptimizer(self._lr_dis).minimize(dis_loss, var_list=var_list)
+        # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
+        dis_optim = tf.train.AdamOptimizer(learning_rate=self._lr_dis, beta1=0.5).minimize(dis_loss, var_list=var_list)
 
         # Summaries
         tf.summary.scalar('dis_loss', dis_loss)
@@ -465,7 +467,8 @@ class VoxelVaegan():
         if self.no_gan:
             # if no gan, we'll want this optimizer to update the decoder network's weights, too
             var_list += self._get_vars_by_scope(self.SCOPE_DECODER)
-        optimizer = tf.train.AdamOptimizer(learning_rate=self._lr_enc).minimize(loss, var_list=var_list)
+        # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
+        optimizer = tf.train.AdamOptimizer(learning_rate=self._lr_enc, beta1=0.5).minimize(loss, var_list=var_list)
 
         tf.summary.scalar("mean_kl", mean_kl) 
         tf.summary.scalar("mean_recon", mean_recon) 
