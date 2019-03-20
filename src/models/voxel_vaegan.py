@@ -26,7 +26,8 @@ class VoxelVaegan():
     
     def __init__(self, input_dim, latent_dim, keep_prob, verbose=False, no_gan=False,
                  kl_div_loss_weight=5, recon_loss_weight=5e-4, ll_weight=.001, dec_weight=10,
-                 debug=False, ckpt_dir='voxel_vaegan', tb_dir='tb'):
+                 debug=False, ckpt_dir='voxel_vaegan', tb_dir='tb', train_vae_cadence=1,
+                 train_gan_cadence=1):
         """
         Args:
             input_dim: int, dimension of voxels to process
@@ -40,6 +41,9 @@ class VoxelVaegan():
             recon_loss_weight: float, weight for reconstruction loss when computing total loss
             debug: bool, flag on whether to log debug info or not
             ckpt_dir: str, name of output dir for model ckpts
+            tb_dir: str, path to save tensorboard logs
+            train_vae_cadence: int, how often (steps) should vae optimizers be run
+            train_gan_cadence: int, how often (steps) should gan optimizers be run
 
         """ 
         logging.info('Initializing VoxelVaegan')
@@ -54,6 +58,8 @@ class VoxelVaegan():
         self.recon_loss_weight = recon_loss_weight
         self.ll_weight = ll_weight
         self.dec_weight = dec_weight
+        self.train_vae_cadence = train_vae_cadence
+        self.train_gan_cadence = train_gan_cadence
         self.step = 0
         
         self._input_x = tf.placeholder(tf.float32, shape=(None, self.input_dim, self.input_dim, self.input_dim, 1))
@@ -84,7 +90,7 @@ class VoxelVaegan():
             # generate from noise
             self.g_noise = self._make_decoder(self._random_latent(), name='noise')
             # discriminate from noise, vae, input
-            self.d_x_noise, self.d_x_noise_ll = self.discriminator(self.g_noise)
+            self.d_x_noise, self.d_x_noise_ll = self._discriminator(self.g_noise)
             self.d_x_vae, self.d_x_vae_ll = self._discriminator(self.decoder)
             self.d_x_real, self.d_x_real_ll = self._discriminator(self._input_x)
             tf.summary.scalar('d_x_noise', tf.reduce_mean(self.d_x_noise))
@@ -93,9 +99,9 @@ class VoxelVaegan():
             
             self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.d_x_real, self.d_x_vae, self.d_x_noise)
             
-            self.ll_loss = self._make_ll_loss(self.dis_input_ll, self.dis_dec_ll)
+            self.ll_loss = self._make_ll_loss(self.d_x_real_ll, self.d_x_vae_ll)
             
-            self.dec_loss, self.dec_optim = self._make_decoder_loss(self.dec_random, self.ll_loss)
+            self.dec_loss, self.dec_optim = self._make_decoder_loss(self.ll_loss, self.dis_loss)
             self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
                                                                            self.enc_mu, self.enc_sig, ll_loss=self.ll_loss)
 
@@ -130,7 +136,9 @@ class VoxelVaegan():
                      debug=cfg_model.get('debug'),
                      ckpt_dir=cfg_model.get('ckpt_dir'),
                      tb_dir=cfg_model.get('tb_dir'),
-                     no_gan=cfg_model.get('no_gan'))
+                     no_gan=cfg_model.get('no_gan'),
+                     train_vae_cadence=cfg_model.get('train_vae_cadence', 1),
+                     train_gan_cadence=cfg_model.get('train_gan_cadence', 1))
         return vaegan
         
     def _log_shape(self, tensor, name=None):
@@ -380,23 +388,20 @@ class VoxelVaegan():
     def _get_vars_by_scope(self, scope):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
     
-    def _make_decoder_loss(self, dec_random, ll_loss):
+    def _make_decoder_loss(self, ll_loss, dis_loss):
         
         # old
         #dec_loss = -tf.reduce_mean(dis_fake_logits)
         
         # Loss
-        dec_random_loss = tf.reduce_mean(-1. * (tf.log(dec_random)))
-        dec_loss = ll_loss * self.ll_weight + dec_random_loss * self.dec_weight
+        dec_loss = ll_loss * self.ll_weight + dis_loss
 
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DECODER)
         # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
         dec_optim = tf.train.AdamOptimizer(learning_rate=self._lr_dec, beta1=0.5).minimize(dec_loss, var_list=var_list)
         #dec_optim = tf.train.RMSPropOptimizer(learning_rate=self._lr_dec).minimize(dec_loss, var_list=var_list)
-
         
-        tf.summary.scalar("dec_random_loss", dec_random_loss) 
         tf.summary.scalar("dec_loss", dec_loss) 
         
         return dec_loss, dec_optim
@@ -406,7 +411,6 @@ class VoxelVaegan():
         ll_loss = tf.reduce_mean(tf.reduce_sum(tf.square(dis_input_ll - dis_dec_ll)))
         tf.summary.scalar("ll_loss", ll_loss)
         return ll_loss
-    
     
     def _make_discriminator_loss(self, d_x_real, d_x_vae, d_x_noise):
         """
@@ -685,7 +689,7 @@ class VoxelVaegan():
                                            summary_writer=train_writer,
                                            summary_op=merge,
                                            optim_ops=optim_ops,
-                                           exec_ops=exec_ops + [self.dis_input_output, self.dis_dec_output],
+                                           exec_ops=exec_ops + [self.d_x_real, self.d_x_vae],
                                            debug_ops=debug_ops)
                 self.step += 1
                 if self.no_gan:
