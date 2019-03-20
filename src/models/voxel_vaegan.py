@@ -73,7 +73,7 @@ class VoxelVaegan():
         
         # Construct the TensorFlow Graph
         self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x, self._keep_prob)
-        self.decoder = self._make_decoder(self.encoder, name='real')
+        self.decoder = self._make_decoder(self.encoder, name='vae')
 
         if self.no_gan:
             logging.info('Running VAE-GAN in VAE-Only Mode')
@@ -81,13 +81,17 @@ class VoxelVaegan():
                                                                            self.enc_mu, self.enc_sig)
 
         else:
-            self.dec_random = self._make_decoder(self._random_latent(), name='fake')
-            self.dis_input_output, self.dis_input_ll = self._discriminator(self._input_x)
-            tf.summary.scalar('dis_input_output', tf.reduce_mean(self.dis_input_output))
-            self.dis_dec_output, self.dis_dec_ll = self._discriminator(self.dec_random)
-            tf.summary.scalar('dis_dec_output', tf.reduce_mean(self.dis_dec_output))
+            # generate from noise
+            self.g_noise = self._make_decoder(self._random_latent(), name='noise')
+            # discriminate from noise, vae, input
+            self.d_x_noise, self.d_x_noise_ll = self.discriminator(self.g_noise)
+            self.d_x_vae, self.d_x_vae_ll = self._discriminator(self.decoder)
+            self.d_x_real, self.d_x_real_ll = self._discriminator(self._input_x)
+            tf.summary.scalar('d_x_noise', tf.reduce_mean(self.d_x_noise))
+            tf.summary.scalar('d_x_vae', tf.reduce_mean(self.d_x_vae))
+            tf.summary.scalar('d_x_real', tf.reduce_mean(self.d_x_real))
             
-            self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.dis_input_output, self.dis_dec_output)
+            self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.d_x_real, self.d_x_vae, self.d_x_noise)
             
             self.ll_loss = self._make_ll_loss(self.dis_input_ll, self.dis_dec_ll)
             
@@ -403,24 +407,23 @@ class VoxelVaegan():
         tf.summary.scalar("ll_loss", ll_loss)
         return ll_loss
     
-    def _make_discriminator_loss(self, dis_input_output, dis_dec_output):
+    
+    def _make_discriminator_loss(self, d_x_real, d_x_vae, d_x_noise):
         """
         """
-        #dis_loss = tf.reduce_mean(-1.*(tf.log(dis_input_output) + 
-        #                            tf.log(1.0 - dis_dec_output)))
-        dis_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(dis_input_output,1e-5,1.0)) + 
-                                    tf.log(tf.clip_by_value(1.0 - dis_dec_output,1e-5,1.0))))
-        dis_loss = dis_loss
+        d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(d_x_real, 1e-5, 1.0)) + 
+                                    tf.log(tf.clip_by_value(1.0 - d_x_vae, 1e-5, 1.0))) +
+                                    tf.log(tf.clip_by_value(1.0 - d_x_noise, 1e-5, 10)))
         
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
         # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
-        dis_optim = tf.train.AdamOptimizer(learning_rate=self._lr_dis, beta1=0.5).minimize(dis_loss, var_list=var_list)
+        d_optim = tf.train.AdamOptimizer(learning_rate=self._lr_dis, beta1=0.5).minimize(d_loss, var_list=var_list)
 
         # Summaries
-        tf.summary.scalar('dis_loss', dis_loss)
+        tf.summary.scalar('d_loss', d_loss)
 
-        return dis_loss, dis_optim
+        return d_loss, d_optim
     
     def _make_encoder_loss(self, enc_input, dec_output, z_mu, z_sig, ll_loss=None):
         """
