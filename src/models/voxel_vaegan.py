@@ -643,9 +643,11 @@ class VoxelVaegan():
         optim_ops = [self.enc_optim]
         exec_ops = [self.enc_loss, self.mean_kl, self.mean_recon]
         if not self.no_gan:
+            # adding optimizer is now dependent on cadence
             optim_ops += [self.dec_optim, self.dis_optim]
             exec_ops = exec_ops + [self.ll_loss, self.dis_loss, self.dec_loss]
         debug_ops = [op for name, op, _ in self._debug_ops]
+        epoch_optim_ops = optim_ops
         
         d_real = .5
         d_fake = .5
@@ -657,6 +659,16 @@ class VoxelVaegan():
 
             logging.info("Epoch: {}, Elapsed Time: {:.2f}".format(epoch, elapsed_time(start)))
             batch_progress = 0
+            
+            if not self.no_gan:
+                # if gan is enabled, set optimizers for this epoch according to cadence
+                epoch_optim_ops = []
+                if (epoch + 1) % self.train_vae_cadence == 0:
+                    logging.info('Training VAE in this epoch')
+                    epoch_optim_ops += [self.enc_optim, self.dec_optim]
+                if (epoch + 1) % self.train_gan_cadence == 0:
+                    logging.info('Training GAN in this epoch')
+                    epoch_optim_ops += [self.dec_loss]
 
             ### Training Loop ###
             for batch_num, batch in enumerate(train_generator()):
@@ -670,7 +682,7 @@ class VoxelVaegan():
 
                     logging.debug('Epoch: {} / {}, Batch: {} ({} / {}), Elapsed time: {:.2f} mins'.format(
                         epoch, epochs, batch_num, batch_progress, inputs, elapsed_time(start)))
-                
+                                
                 # adaptive learning rate
                 #enc_current_lr = enc_lr * self.sigmoid(np.mean(d_real), -.5, 15)
                 #dec_current_lr = dec_lr * self.sigmoid(np.mean(d_real), -.5, 15)
@@ -679,7 +691,6 @@ class VoxelVaegan():
                 dec_current_lr = dec_lr
                 dis_current_lr = dis_lr
 
-                #merge = tf.summary.merge_all()
                 results = self._model_step(feed_dict={self._input_x: batch,
                                                       self._keep_prob:self.keep_prob,
                                                       self._lr_enc: enc_current_lr,
