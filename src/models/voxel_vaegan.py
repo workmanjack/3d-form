@@ -361,7 +361,7 @@ class VoxelVaegan():
             self._log_shape(lrelu3)
             
             # output layer
-            conv4 = tf.layers.conv3d(lrelu3, 1, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
+            conv4 = tf.layers.conv3d(lrelu3, 1024, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
             self._log_shape(conv4)
             
