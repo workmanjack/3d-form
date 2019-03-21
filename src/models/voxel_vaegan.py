@@ -7,6 +7,7 @@ from collections import defaultdict
 import tensorflow as tf
 import logging.config
 import numpy as np
+import random
 import json
 import math
 import time
@@ -27,7 +28,7 @@ class VoxelVaegan():
     def __init__(self, input_dim, latent_dim, keep_prob, verbose=False, no_gan=False,
                  kl_div_loss_weight=5, recon_loss_weight=5e-4, ll_weight=.001, dec_weight=10,
                  debug=False, ckpt_dir='voxel_vaegan', tb_dir='tb', train_vae_cadence=1,
-                 train_gan_cadence=1):
+                 train_gan_cadence=1, dis_noise=0, adaptive_lr=False):
         """
         Args:
             input_dim: int, dimension of voxels to process
@@ -44,6 +45,8 @@ class VoxelVaegan():
             tb_dir: str, path to save tensorboard logs
             train_vae_cadence: int, how often (steps) should vae optimizers be run
             train_gan_cadence: int, how often (steps) should gan optimizers be run
+            dis_noise: float, how much noise to apply to discriminator's decisions during training
+            adaptive_lr: bool, flag to use adaptive learning rates or not (see train function)
 
         """ 
         logging.info('Initializing VoxelVaegan')
@@ -61,6 +64,7 @@ class VoxelVaegan():
         self.train_vae_cadence = train_vae_cadence
         self.train_gan_cadence = train_gan_cadence
         self.step = 0
+        self.adaptive_lr = adaptive_lr
         
         self._input_x = tf.placeholder(tf.float32, shape=(None, self.input_dim, self.input_dim, self.input_dim, 1))
         self._keep_prob = tf.placeholder(dtype=tf.float32)
@@ -138,7 +142,9 @@ class VoxelVaegan():
                      tb_dir=cfg_model.get('tb_dir'),
                      no_gan=cfg_model.get('no_gan'),
                      train_vae_cadence=cfg_model.get('train_vae_cadence', 1),
-                     train_gan_cadence=cfg_model.get('train_gan_cadence', 1))
+                     train_gan_cadence=cfg_model.get('train_gan_cadence', 1),
+                     dis_noise=cfg_model.get('dis_noise'),
+                     adaptive_lr=cfg_model.get('adaptive_lr'))
         return vaegan
         
     def _log_shape(self, tensor, name=None):
@@ -365,7 +371,7 @@ class VoxelVaegan():
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
             self._log_shape(conv4)
             
-            flatten = tf.layers.flatten(conv4)
+            flatten = tf.layers.flatten(tf.nn.dropout(conv4, keep_prob))
             self._log_shape(flatten)
         
             lth_layer = tf.layers.dense(flatten,
@@ -412,12 +418,38 @@ class VoxelVaegan():
         tf.summary.scalar("ll_loss", ll_loss)
         return ll_loss
     
-    def _make_discriminator_loss(self, d_x_real, d_x_vae, d_x_noise):
+    def _add_noise(self, value, noise_window):
         """
+        Adds or subtracts a random value within noise_window to/from value
+        
+        Args:
+            value: float, value to add noise to
+            noise_window: float, percentage window (example, 5%) of noise to add
+            
+        Returns:
+            float, value with noise
         """
-        d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(d_x_real, 1e-5, 1.0)) + 
-                                    tf.log(tf.clip_by_value(1.0 - d_x_vae, 1e-5, 1.0))) +
-                                    tf.log(tf.clip_by_value(1.0 - d_x_noise, 1e-5, 10)))
+        noise_limit = value * noise_window
+        value = value + random.uniform(-noise_limit, noise_limit)
+        return value
+
+    def _make_discriminator_loss(self, d_x_real, d_x_vae, d_x_noise, noise_window=0):
+        """
+        Calculates the loss of the discriminator
+        
+        Args:
+            d_x_real: float, prediction of discriminator that the real input for this step is real
+            d_x_vae: float, prediction of discriminator that the vae's output from the encoded real input for this step is real
+            d_x_noise: float, prediction of discriminator that the vae's output from the encoded noise vector for this step is real
+            noise_window: float, how much noise to apply to the prediction values (ex: 0.05 would be 5% noise)
+            
+        Returns:
+            float, discriminator loss
+            optimizer, discriminator's optimizer
+        """
+        d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)) + 
+                                    tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))) +
+                                    tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_noise, noise_window), 1e-5, 10)))
         
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
@@ -684,12 +716,13 @@ class VoxelVaegan():
                         epoch, epochs, batch_num, batch_progress, inputs, elapsed_time(start)))
                                 
                 # adaptive learning rate
-                #enc_current_lr = enc_lr * self.sigmoid(np.mean(d_real), -.5, 15)
-                #dec_current_lr = dec_lr * self.sigmoid(np.mean(d_real), -.5, 15)
-                #dis_current_lr = dis_lr * self.sigmoid(np.mean(d_fake), -.5, 15)
                 enc_current_lr = enc_lr
                 dec_current_lr = dec_lr
                 dis_current_lr = dis_lr
+                if self.adaptive_lr:
+                    enc_current_lr = enc_lr * self.sigmoid(np.mean(d_real), -.5, 15)
+                    dec_current_lr = dec_lr * self.sigmoid(np.mean(d_real), -.5, 15)
+                    dis_current_lr = dis_lr * self.sigmoid(np.mean(d_fake), -.5, 15)
 
                 results = self._model_step(feed_dict={self._input_x: batch,
                                                       self._keep_prob:self.keep_prob,
