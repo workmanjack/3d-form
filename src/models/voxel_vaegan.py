@@ -82,7 +82,7 @@ class VoxelVaegan():
         self._debug_ops = list()
         
         # Construct the TensorFlow Graph
-        self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x, self._keep_prob)
+        self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x)
         self.decoder = self._make_decoder(self.encoder, name='vae')
 
         if self.no_gan:
@@ -97,9 +97,12 @@ class VoxelVaegan():
             self.d_x_noise, self.d_x_noise_ll = self._discriminator(self.g_noise)
             self.d_x_vae, self.d_x_vae_ll = self._discriminator(self.decoder)
             self.d_x_real, self.d_x_real_ll = self._discriminator(self._input_x)
-            tf.summary.scalar('d_x_noise', tf.reduce_mean(self.d_x_noise))
-            tf.summary.scalar('d_x_vae', tf.reduce_mean(self.d_x_vae))
-            tf.summary.scalar('d_x_real', tf.reduce_mean(self.d_x_real))
+            tf.summary.scalar('d_x_noise', tf.reduce_mean(self.d_x_noise), family='dis_losses')
+            tf.summary.scalar('d_x_vae', tf.reduce_mean(self.d_x_vae), family='dis_losses')
+            tf.summary.scalar('d_x_real', tf.reduce_mean(self.d_x_real), family='dis_losses')
+            tf.summary.scalar('d_x_noise_ll', tf.reduce_mean(self.d_x_noise_ll), family='dis_lls')
+            tf.summary.scalar('d_x_vae_ll', tf.reduce_mean(self.d_x_vae_ll), family='dis_lls')
+            tf.summary.scalar('d_x_real_ll', tf.reduce_mean(self.d_x_real_ll), family='dis_lls')
             
             self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.d_x_real, self.d_x_vae, self.d_x_noise)
             
@@ -154,7 +157,7 @@ class VoxelVaegan():
             logging.debug('{}: {}'.format(name, tensor.shape))
         return
     
-    def _make_encoder(self, input_x, keep_prob):
+    def _make_encoder(self, input_x):
         
         with tf.variable_scope(self.SCOPE_ENCODER, reuse=tf.AUTO_REUSE):
         
@@ -217,7 +220,7 @@ class VoxelVaegan():
             self._log_shape(dense1)
 
             # Apply dropout
-            flatten = tf.layers.flatten(tf.nn.dropout(dense1, keep_prob))
+            flatten = tf.layers.flatten(tf.nn.dropout(dense1, self._keep_prob))
 
             # Calculate outputs
             enc_mu = tf.layers.dense(flatten,
@@ -371,7 +374,7 @@ class VoxelVaegan():
                                      kernel_initializer=tf.contrib.layers.xavier_initializer())
             self._log_shape(conv4)
             
-            flatten = tf.layers.flatten(tf.nn.dropout(conv4, keep_prob))
+            flatten = tf.layers.flatten(tf.nn.dropout(conv4, self._keep_prob))
             self._log_shape(flatten)
         
             lth_layer = tf.layers.dense(flatten,
@@ -442,15 +445,26 @@ class VoxelVaegan():
             d_x_vae: float, prediction of discriminator that the vae's output from the encoded real input for this step is real
             d_x_noise: float, prediction of discriminator that the vae's output from the encoded noise vector for this step is real
             noise_window: float, how much noise to apply to the prediction values (ex: 0.05 would be 5% noise)
-            
+
         Returns:
             float, discriminator loss
             optimizer, discriminator's optimizer
         """
-        d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)) + 
-                                    tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))) +
-                                    tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_noise, noise_window), 1e-5, 10)))
-        
+        #self._add_debug_op('dis_loss: log d_x_real', tf.reduce_mean(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0))))
+        #self._add_debug_op('dis_loss: log d_x_vae', tf.reduce_mean(tf.log(tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))))
+        #self._add_debug_op('dis_loss: log d_x_noise', tf.reduce_mean(tf.log(tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0))))
+        self._add_debug_op('dis_loss: d_x_real', tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)))
+        self._add_debug_op('dis_loss: d_x_vae', tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0)))
+        self._add_debug_op('dis_loss: d_x_noise', tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
+        self._add_debug_op('dis_loss: 1 - d_x_vae', tf.reduce_mean(1.0 - tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0)))
+        self._add_debug_op('dis_loss: 1 - d_x_noise', tf.reduce_mean(1.0 - tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
+        #d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)) + 
+        #                            tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))) +
+        #                            tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
+        d_loss = tf.reduce_mean(tf.math.abs(2.*(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0) -
+                                    tf.clip_by_value(1.0 - self._add_noise(d_x_vae, noise_window), 1e-5, 1.0) -
+                                    tf.clip_by_value(1.0 - self._add_noise(d_x_noise, noise_window), 1e-5, 1.0))))
+        self._add_debug_op('dis_loss', d_loss)
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
         # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
