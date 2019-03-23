@@ -853,6 +853,20 @@ class VoxelVaegan():
                     
         return decoded
     
+    def discriminate(self, input_x, discriminator_op=None):
+        if discriminator_op is None:
+            discriminator_op = self.d_x_real
+        print('discriminator_op: {}'.format(discriminator_op))
+        ops = tuple([discriminator_op] + [op for name, op, _ in self._debug_ops])
+                    
+        results = self.sess.run(ops, 
+            feed_dict={self._input_x: input_x, self._keep_prob: 1.0})
+        
+        discriminated = results[0]
+        self._log_debug_ops(results[1:])
+                    
+        return discriminated[0][0]
+    
     def _random_latent(self):
         return tf.random_normal(tf.stack([self._batch_size, self.latent_dim]))
 
