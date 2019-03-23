@@ -496,9 +496,9 @@ class VoxelVaegan():
         loss_real = tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0))
         loss_vae = tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))
         loss_noise = tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0))
-        self._add_debug_op('dis_loss: d_x_real', loss_real)
-        self._add_debug_op('dis_loss: d_x_vae', loss_vae)
-        self._add_debug_op('dis_loss: d_x_noise', loss_noise)
+        #self._add_debug_op('dis_loss: d_x_real', loss_real)
+        #self._add_debug_op('dis_loss: d_x_vae', loss_vae)
+        #self._add_debug_op('dis_loss: d_x_noise', loss_noise)
         #self._add_debug_op('dis_loss: 1 - d_x_vae', tf.reduce_mean(1.0 - tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0)))
         #self._add_debug_op('dis_loss: 1 - d_x_noise', tf.reduce_mean(1.0 - tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
         #d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)) + 
@@ -560,7 +560,7 @@ class VoxelVaegan():
             #L_e = tf.clip_by_value(KL_loss*KL_param + LL_loss, -100, 100)
             loss = self.kl_div_loss_weight * mean_kl + ll_loss * self.ll_weight
             
-        self._add_debug_op('encoder loss', loss)
+        #self._add_debug_op('encoder loss', loss)
 
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
         if self.no_gan:
@@ -734,7 +734,7 @@ class VoxelVaegan():
         if not self.no_gan:
             # adding optimizer is now dependent on cadence
             optim_ops += [self.dec_optim, self.dis_optim]
-            exec_ops = exec_ops + [self.ll_loss, self.dis_loss, self.dec_loss]
+            exec_ops = exec_ops + [self.ll_loss, self.dis_loss, self.dec_loss, self.d_x_real, self.d_x_vae]
         debug_ops = [op for name, op, _ in self._debug_ops]
         epoch_optim_ops = optim_ops
         
@@ -790,7 +790,7 @@ class VoxelVaegan():
                                            summary_writer=train_writer,
                                            summary_op=merge,
                                            optim_ops=optim_ops,
-                                           exec_ops=exec_ops + [self.d_x_real, self.d_x_vae],
+                                           exec_ops=exec_ops,
                                            debug_ops=debug_ops)
                 self.step += 1
                 if self.no_gan:
@@ -799,6 +799,8 @@ class VoxelVaegan():
                     ll_loss = -999
                     dis_loss = -999
                     dec_loss = -999
+                    d_real = -999
+                    d_fake = -999
                 else:
                     enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, d_real, d_fake = results
 
@@ -841,6 +843,7 @@ class VoxelVaegan():
                         ll_loss = -999
                         dis_loss = -999
                         dec_loss = -999
+                        
                     else:
                         enc_loss, kl, recon, ll_loss, dis_loss, dec_loss = results
                     self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
