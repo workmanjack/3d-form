@@ -65,6 +65,7 @@ class VoxelVaegan():
         self.train_gan_cadence = train_gan_cadence
         self.step = 0
         self.adaptive_lr = adaptive_lr
+        self._d_layers = None
         
         self._input_x = tf.placeholder(tf.float32, shape=(None, self.input_dim, self.input_dim, self.input_dim, 1))
         self._keep_prob = tf.placeholder(dtype=tf.float32)
@@ -94,9 +95,9 @@ class VoxelVaegan():
             # generate from noise
             self.g_noise = self._make_decoder(self._random_latent(), name='noise')
             # discriminate from noise, vae, input
-            self.d_x_noise, self.d_x_noise_ll = self._discriminator(self.g_noise)
-            self.d_x_vae, self.d_x_vae_ll = self._discriminator(self.decoder)
-            self.d_x_real, self.d_x_real_ll = self._discriminator(self._input_x)
+            self.d_x_noise, self.d_x_noise_ll = self._make_discriminator(self.g_noise)
+            self.d_x_vae, self.d_x_vae_ll = self._make_discriminator(self.decoder)
+            self.d_x_real, self.d_x_real_ll = self._make_discriminator(self._input_x)
             tf.summary.scalar('d_x_noise', tf.reduce_mean(self.d_x_noise), family='dis_losses')
             tf.summary.scalar('d_x_vae', tf.reduce_mean(self.d_x_vae), family='dis_losses')
             tf.summary.scalar('d_x_real', tf.reduce_mean(self.d_x_real), family='dis_losses')
@@ -112,7 +113,11 @@ class VoxelVaegan():
             self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
                                                                            self.enc_mu, self.enc_sig, ll_loss=self.ll_loss)
 
-    
+        logging.debug('tf encoder vars: {}'.format([str(v) + '\n' for v in self._get_vars_by_scope(self.SCOPE_ENCODER)]))
+        logging.debug('tf decoder vars: {}'.format([str(v) + '\n' for v in self._get_vars_by_scope(self.SCOPE_DECODER)]))
+        logging.debug('tf discriminator vars: {}'.format([str(v) + '\n' for v in self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)]))
+            
+            
         # Initializing the tensor flow variables
         init = tf.global_variables_initializer()
         
@@ -339,60 +344,115 @@ class VoxelVaegan():
 
         return decoded_output
     
-    def _discriminator(self, input_x):
+    def _make_discriminator(self, input_x):
         """
         Thank you: https://github.com/Spartey/3D-VAE-GAN-Deep-Learning-Project/blob/master/3D-VAE-WGAN/model.py
+        
+        It does not look like the layers are being shared across discriminator calls:
+        https://github.com/tensorflow/tensorflow/issues/20842
+        
+        Solution: create the variables then call them for future discriminator tasks
         """
-
         with tf.variable_scope(self.SCOPE_DISCRIMINATOR, reuse=tf.AUTO_REUSE):
 
-            # need to clip the values?
-            self._log_shape(input_x, 'input_x')
+            if self._d_layers is None:
 
-            # 1st hidden layer
-            # do not use batch norm to increase stability as instructed in
-            # https://arxiv.org/pdf/1511.06434.pdf
-            conv1 = tf.layers.conv3d(input_x, 128, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
-                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            lrelu1 = tf.nn.leaky_relu(conv1)
-            self._log_shape(lrelu1)
+                # construct the layers
+                self._d_layers = list()
 
-            # 2nd hidden layer
-            conv2 = tf.layers.conv3d(lrelu1, 256, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer())
-            lrelu2 = tf.nn.leaky_relu(tf.layers.batch_normalization(conv2))
-            self._log_shape(lrelu2)
+                self._log_shape(input_x, 'input_x')
 
-            # 3rd hidden layer
-            conv3 = tf.layers.conv3d(lrelu2, 512, [4, 4, 4], strides=(2, 2, 2), padding='same', use_bias=False,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer())
-            lrelu3 = tf.nn.leaky_relu(tf.layers.batch_normalization(conv3))
-            self._log_shape(lrelu3)
-            
-            # output layer
-            conv4 = tf.layers.conv3d(lrelu3, 1024, [4, 4, 4], strides=(1, 1, 1), padding='valid', use_bias=False,
-                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            self._log_shape(conv4)
-            
-            flatten = tf.layers.flatten(tf.nn.dropout(conv4, self._keep_prob))
-            self._log_shape(flatten)
-        
-            lth_layer = tf.layers.dense(flatten,
-                                        units=1024,
-                                        kernel_initializer=tf.initializers.glorot_uniform(),
-                                        name='lth_layer')
-            lth_relu = tf.nn.leaky_relu(tf.layers.batch_normalization(lth_layer))
-            self._log_shape(lth_relu)
-            
-            D = tf.layers.dense(lth_relu,
-                                units=1,
-                                kernel_initializer=tf.initializers.glorot_uniform(),
-                                name='D')
-            
-            D = tf.nn.sigmoid(D)
-            self._log_shape(D)
+                # 1st hidden layer
+                # do not use batch norm to increase stability as instructed in
+                # https://arxiv.org/pdf/1511.06434.pdf
+                conv1 = tf.layers.conv3d(input_x,
+                                         128,
+                                         [4, 4, 4],
+                                         strides=(2, 2, 2),
+                                         padding='same',
+                                         activation=tf.nn.leaky_relu,
+                                         use_bias=False,
+                                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                         name='dis_conv1')
+                self._log_shape(conv1)
+                self._d_layers.append(conv1)                
 
-        return D, lth_relu
+                # 2nd hidden layer
+                conv2 = tf.layers.batch_normalization(tf.layers.conv3d(conv1,
+                                         256,
+                                         [4, 4, 4],
+                                         strides=(2, 2, 2),
+                                         padding='same',
+                                         activation=tf.nn.leaky_relu,
+                                         use_bias=False,
+                                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                         name='dis_conv2'), name='dis_batchnorm2')
+                self._log_shape(conv2)
+                self._d_layers.append(conv2)
+
+                # 3rd hidden layer
+                conv3 = tf.layers.batch_normalization(tf.layers.conv3d(conv2,
+                                         512,
+                                         [4, 4, 4],
+                                         strides=(2, 2, 2),
+                                         padding='same',
+                                         use_bias=False,
+                                         activation=tf.nn.leaky_relu,
+                                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                         name='dis_conv3'), name='dis_batchnorm3')
+                self._log_shape(conv3)
+                self._d_layers.append(conv3)
+
+                # output layer
+                conv4 = tf.layers.conv3d(conv3,
+                                         1024,
+                                         [4, 4, 4],
+                                         strides=(1, 1, 1),
+                                         padding='valid',
+                                         use_bias=False,
+                                         kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                         name='dis_conv4')
+                self._log_shape(conv4)
+                self._d_layers.append(conv4)
+
+                flatten = tf.layers.flatten(tf.nn.dropout(
+                                        conv4,
+                                        self._keep_prob,
+                                        name='dis_dropout'), name='dis_flatten')
+                self._log_shape(flatten)
+                self._d_layers.append(flatten)
+
+                lth_layer = tf.layers.batch_normalization(tf.layers.dense(flatten,
+                                            units=1024,
+                                            kernel_initializer=tf.initializers.glorot_uniform(),
+                                            activation=tf.nn.leaky_relu,
+                                            name='dis_dense1_lth_layer'), name='dis_batchnorm_ll')
+                self._log_shape(lth_layer)
+                self._d_layers.append(lth_layer)
+
+                D = tf.layers.dense(lth_layer,
+                                    units=1,
+                                    kernel_initializer=tf.initializers.glorot_uniform(),
+                                    activation=tf.nn.sigmoid,
+                                    name='dis_dense2_decision')
+                self._log_shape(D)
+                self._d_layers.append(D)
+
+            # use our layers to produce a decision
+            layer_input = input_x
+            ll_output = None
+            d_output = None
+            for i, layer in enumerate(self._d_layers):
+                
+                layer_input = layer(layer_input)
+                if i + 2 == len(self._d_layers):
+                    # ll layer is the second-to-last layer; save result for loss calc
+                    ll_output = layer_input
+                if i + 1 == len(self._d_layers):
+                    # decision layer is the last layer; save result for loss calc
+                    d_output = layer_input
+
+        return d_output, ll_output
     
     def _get_vars_by_scope(self, scope):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
