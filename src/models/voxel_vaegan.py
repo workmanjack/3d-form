@@ -95,9 +95,12 @@ class VoxelVaegan():
             # generate from noise
             self.g_noise = self._make_decoder(self._random_latent(), name='noise')
             # discriminate from noise, vae, input
-            self.d_x_noise, self.d_x_noise_ll = self._make_discriminator(self.g_noise)
-            self.d_x_vae, self.d_x_vae_ll = self._make_discriminator(self.decoder)
-            self.d_x_real, self.d_x_real_ll = self._make_discriminator(self._input_x)
+            with tf.variable_scope(self.SCOPE_DISCRIMINATOR) as dis_scope:
+                self.d_x_noise, self.d_x_noise_ll = self._make_discriminator(self.g_noise)
+            with tf.variable_scope(dis_scope, reuse=True):
+                self.d_x_vae, self.d_x_vae_ll = self._make_discriminator(self.decoder)
+            with tf.variable_scope(dis_scope, reuse=True):
+                self.d_x_real, self.d_x_real_ll = self._make_discriminator(self._input_x)
             tf.summary.scalar('d_x_noise', tf.reduce_mean(self.d_x_noise), family='dis_losses')
             tf.summary.scalar('d_x_vae', tf.reduce_mean(self.d_x_vae), family='dis_losses')
             tf.summary.scalar('d_x_real', tf.reduce_mean(self.d_x_real), family='dis_losses')
@@ -352,79 +355,78 @@ class VoxelVaegan():
         
         Solution: create the variables then call them for future discriminator tasks
         """
-        with tf.variable_scope(self.SCOPE_DISCRIMINATOR, reuse=tf.AUTO_REUSE):
+        self._log_shape(input_x, 'input_x')
 
-            self._log_shape(input_x, 'input_x')
+        # 1st hidden layer
+        # do not use batch norm to increase stability as instructed in
+        # https://arxiv.org/pdf/1511.06434.pdf
+        conv1 = tf.layers.conv3d(input_x,
+                                 128,
+                                 [4, 4, 4],
+                                 strides=(2, 2, 2),
+                                 padding='same',
+                                 activation=tf.nn.leaky_relu,
+                                 use_bias=False,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
+        self._log_shape(conv1)
 
-            # 1st hidden layer
-            # do not use batch norm to increase stability as instructed in
-            # https://arxiv.org/pdf/1511.06434.pdf
-            conv1 = tf.layers.conv3d(input_x,
-                                     128,
-                                     [4, 4, 4],
-                                     strides=(2, 2, 2),
-                                     padding='same',
-                                     activation=tf.nn.leaky_relu,
-                                     use_bias=False,
-                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            self._log_shape(conv1)
+        # 2nd hidden layer
+        conv2 = tf.layers.batch_normalization(tf.layers.conv3d(conv1,
+                                 256,
+                                 [4, 4, 4],
+                                 strides=(2, 2, 2),
+                                 padding='same',
+                                 activation=tf.nn.leaky_relu,
+                                 use_bias=False,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                 name='dis_conv2'), name='dis_batchnorm2')
+        self._log_shape(conv2)
 
-            # 2nd hidden layer
-            conv2 = tf.layers.batch_normalization(tf.layers.conv3d(conv1,
-                                     256,
-                                     [4, 4, 4],
-                                     strides=(2, 2, 2),
-                                     padding='same',
-                                     activation=tf.nn.leaky_relu,
-                                     use_bias=False,
-                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                     name='dis_conv2'), name='dis_batchnorm2')
-            self._log_shape(conv2)
+        # 3rd hidden layer
+        conv3 = tf.layers.batch_normalization(tf.layers.conv3d(conv2,
+                                 512,
+                                 [4, 4, 4],
+                                 strides=(2, 2, 2),
+                                 padding='same',
+                                 use_bias=False,
+                                 activation=tf.nn.leaky_relu,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                 name='dis_conv3'), name='dis_batchnorm3')
+        self._log_shape(conv3)
 
-            # 3rd hidden layer
-            conv3 = tf.layers.batch_normalization(tf.layers.conv3d(conv2,
-                                     512,
-                                     [4, 4, 4],
-                                     strides=(2, 2, 2),
-                                     padding='same',
-                                     use_bias=False,
-                                     activation=tf.nn.leaky_relu,
-                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                     name='dis_conv3'), name='dis_batchnorm3')
-            self._log_shape(conv3)
+        # output layer
+        conv4 = tf.layers.conv3d(conv3,
+                                 1024,
+                                 [4, 4, 4],
+                                 strides=(1, 1, 1),
+                                 padding='valid',
+                                 use_bias=False,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                 name='dis_conv4')
+        self._log_shape(conv4)
 
-            # output layer
-            conv4 = tf.layers.conv3d(conv3,
-                                     1024,
-                                     [4, 4, 4],
-                                     strides=(1, 1, 1),
-                                     padding='valid',
-                                     use_bias=False,
-                                     kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                     name='dis_conv4')
-            self._log_shape(conv4)
+        flatten = tf.layers.flatten(tf.nn.dropout(
+                                conv4,
+                                self._keep_prob,
+                                name='dis_dropout'), name='dis_flatten')
+        self._log_shape(flatten)
 
-            flatten = tf.layers.flatten(tf.nn.dropout(
-                                    conv4,
-                                    self._keep_prob,
-                                    name='dis_dropout'), name='dis_flatten')
-            self._log_shape(flatten)
+        lth_layer = tf.layers.batch_normalization(tf.layers.dense(flatten,
+                                    units=1024,
+                                    kernel_initializer=tf.initializers.glorot_uniform(),
+                                    activation=tf.nn.leaky_relu,
+                                    name='dis_dense1_lth_layer'), name='dis_batchnorm_ll')
+        self._log_shape(lth_layer)
 
-            lth_layer = tf.layers.batch_normalization(tf.layers.dense(flatten,
-                                        units=1024,
-                                        kernel_initializer=tf.initializers.glorot_uniform(),
-                                        activation=tf.nn.leaky_relu,
-                                        name='dis_dense1_lth_layer'), name='dis_batchnorm_ll')
-            self._log_shape(lth_layer)
+        d_layer = tf.layers.dense(lth_layer,
+                            units=1,
+                            kernel_initializer=tf.initializers.glorot_uniform(),
+                            name='dis_dense2_decision')
+        self._log_shape(d_layer)
+        
+        d_output = tf.nn.sigmoid(d_layer)
 
-            D = tf.layers.dense(lth_layer,
-                                units=1,
-                                kernel_initializer=tf.initializers.glorot_uniform(),
-                                activation=tf.nn.sigmoid,
-                                name='dis_dense2_decision')
-            self._log_shape(D)
-
-        return D, lth_layer
+        return d_output, lth_layer
     
     def _get_vars_by_scope(self, scope):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
@@ -491,18 +493,19 @@ class VoxelVaegan():
         #self._add_debug_op('dis_loss: log d_x_real', tf.reduce_mean(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0))))
         #self._add_debug_op('dis_loss: log d_x_vae', tf.reduce_mean(tf.log(tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))))
         #self._add_debug_op('dis_loss: log d_x_noise', tf.reduce_mean(tf.log(tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0))))
-        #self._add_debug_op('dis_loss: d_x_real', tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)))
-        #self._add_debug_op('dis_loss: d_x_vae', tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0)))
-        #self._add_debug_op('dis_loss: d_x_noise', tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
+        loss_real = tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0))
+        loss_vae = tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))
+        loss_noise = tf.reduce_mean(tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0))
+        self._add_debug_op('dis_loss: d_x_real', loss_real)
+        self._add_debug_op('dis_loss: d_x_vae', loss_vae)
+        self._add_debug_op('dis_loss: d_x_noise', loss_noise)
         #self._add_debug_op('dis_loss: 1 - d_x_vae', tf.reduce_mean(1.0 - tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0)))
         #self._add_debug_op('dis_loss: 1 - d_x_noise', tf.reduce_mean(1.0 - tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
         #d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)) + 
         #                            tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))) +
         #                            tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
-        d_loss = tf.reduce_mean(tf.math.abs(2.*(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0) -
-                                    tf.clip_by_value(1.0 - self._add_noise(d_x_vae, noise_window), 1e-5, 1.0) -
-                                    tf.clip_by_value(1.0 - self._add_noise(d_x_noise, noise_window), 1e-5, 1.0))))
-        #self._add_debug_op('dis_loss', d_loss)
+        d_loss = tf.math.abs(2.0 * loss_real - (1 - loss_vae) - (1 - loss_noise))
+        self._add_debug_op('dis_loss', d_loss)
         # Optimizer
         var_list = self._get_vars_by_scope(self.SCOPE_DISCRIMINATOR)
         # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
@@ -556,6 +559,8 @@ class VoxelVaegan():
             # otherwise, we use the discriminator's input
             #L_e = tf.clip_by_value(KL_loss*KL_param + LL_loss, -100, 100)
             loss = self.kl_div_loss_weight * mean_kl + ll_loss * self.ll_weight
+            
+        self._add_debug_op('encoder loss', loss)
 
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
         if self.no_gan:
@@ -801,7 +806,7 @@ class VoxelVaegan():
                     self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
                     
                 logging.info('Memory Use (GB): {}'.format(memory()))
-
+                
             self._save_model_step_results(epoch, enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
 
             ### Save Model Checkpoint ###
