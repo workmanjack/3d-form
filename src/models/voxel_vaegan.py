@@ -243,7 +243,7 @@ class VoxelVaegan():
             self._batch_size = tf.shape(dense1)[0]
             epsilon = self._random_latent()
             self._log_shape(epsilon, 'epsilon')
-            enc_z = tf.add(enc_mu, tf.multiply(tf.sqrt(tf.exp(enc_sig)), epsilon))
+            #enc_z = tf.add(enc_mu, tf.multiply(tf.sqrt(tf.exp(enc_sig)), epsilon))
             enc_z = enc_mu + tf.multiply(epsilon, tf.exp(enc_sig))
             self._log_shape(enc_z, 'z')
 
@@ -915,13 +915,19 @@ class VoxelVaegan():
     
     def _random_latent(self):
         return tf.random_normal(tf.stack([self._batch_size, self.latent_dim]))
-
+    
     def random_latent_vector(self):
         """
         Create a latent vector for vaegan
+        
+        TODO: current architecture does not support this. enc_mu and enc_sig are dependent on 
+        the input_x placeholder which gets passed through the encoder.
         """
-        latent_vector = tf.Session().run(self._random_latent())
-        return latent_vector
+        rlatent = self._random_latent()
+        latent, mu, sig = self.sess.run((rlatent, self.enc_mu, self.enc_sig),
+                               feed_dict={self._input_x: np.zeros((1, 32, 32, 32, 1)), self._keep_prob: 1.0})
+        z = mu + latent * np.exp(sig)
+        return z
 
     def latent_recon(self, latent_vector):
         """
