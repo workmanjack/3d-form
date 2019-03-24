@@ -471,10 +471,9 @@ class Thingi10k(IndexedDataset):
                     batch.append(np.zeros([voxels_dim, voxels_dim, voxels_dim, 1]))
                 yield np.asarray(batch)
         return
-    
-	
-	def voxels_batchmaker_2(self, batch_size, voxels_dim, verbose=False):
-		# generate a pair of files for mashup
+
+    def voxels_batchmaker_2(self, batch_size, voxels_dim, verbose=False):
+        # generate a pair of files for mashup
         batch_1 = list()
         batch_2 = list()
         for i, stl_file in enumerate(self.df.stl_file):
@@ -493,9 +492,7 @@ class Thingi10k(IndexedDataset):
                 batch_1 = list()
                 batch_2 = list()
         return
-	
-	
-	
+
     def split(self, train_split, test_size):
         """
         Assumes that you want dev & test to be the same size

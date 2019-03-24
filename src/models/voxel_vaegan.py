@@ -726,7 +726,6 @@ class VoxelVaegan():
         merge = tf.summary.merge_all()
 
         # https://riptutorial.com/tensorflow/example/13426/use-graph-finalize---to-catch-nodes-being-added-to-the-graph
-
         #self.sess.graph.finalize()  # Graph is read-only after this statement.
 
         optim_ops = [self.enc_optim]
