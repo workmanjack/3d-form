@@ -18,4 +18,5 @@ MODELNET10_TOILET_INDEX = os.path.join(PROCESSED_DIR, 'modelnet10_toilet_index.c
 MODELNET10_SOFA_INDEX = os.path.join(PROCESSED_DIR, 'modelnet10_sofa_index.csv')
 MODELNET10_BATHTUB_INDEX = os.path.join(PROCESSED_DIR, 'modelnet10_bathtub_index.csv')
 MODELNET10_SOFA_TOILET_INDEX = os.path.join(PROCESSED_DIR, 'modelnet10_sofa-toilet_index.csv')
+MODELNET10_TOILET_NOROTATION_INDEX = os.path.join(PROCESSED_DIR, 'modelnet10_toilet_index_norotation.csv')
 BINVOX = os.path.join(PROJECT_ROOT, 'src', 'data', 'binvox')

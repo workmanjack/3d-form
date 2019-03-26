@@ -135,24 +135,24 @@ class ModelNet10(IndexedDataset):
     
     def voxels_batchmaker_2(self, batch_size, voxels_dim, set_filter=None):
         """
-		Test for mashup of two files
+        Test for mashup of two files
         Args:
             batch_size: int
             set_filter: str, "train" or "test" or None; returns specified dataset or both
             verbose: bool, extra debug prints
             pad: bool, pads final batch with all-zero examples or skips remainder
         """
-		# generate a pair of files
+        # generate a pair of files
         batch_1 = list()
         batch_2 = list()
-		
+        
         if set_filter in ['train', 'test']:
             df_slicer = self.df.dataset == set_filter
             #if verbose:
             #    print('Creating dataset split for "{}"'.format(set_filter))
         else:
             df_slicer = self.df == self.df
-			
+
         for i, (index, row) in enumerate(self.df[df_slicer].iterrows()):
             vox_data = self.get_voxels(row['category'], row['dataset'], row['binvox'], shape=[voxels_dim, voxels_dim, voxels_dim, 1])
             if vox_data is None:
@@ -169,7 +169,6 @@ class ModelNet10(IndexedDataset):
                 batch_2 = list()
 
         return
-
         
     def __repr__(self):
         return '<ModelNet10()>'
