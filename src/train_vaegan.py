@@ -62,6 +62,14 @@ def train_vaegan(cfg):
     if filter_id:
         logging.info('Filtering dataset by id: {}'.format(filter_id))
         thingi.filter_by_id(filter_id)
+    # filter by category, if specified
+    data_categories = cfg.get('dataset').get('categories', None)
+    if dataset_class == ModelNet10 and data_categories:
+        logging.info('Filtering dataset by categories: {}'.format(data_categories))
+        logging.info('N before filter: {}'.format(len(dataset)))
+        dataset.filter_categories(data_categories)
+        logging.info('N after filter: {}'.format(len(dataset)))
+        
     n_input = len(dataset)
     logging.info('dataset n_input={}'.format(n_input))
 
@@ -102,7 +110,7 @@ def train_vaegan(cfg):
             batch_size=BATCH_SIZE, voxels_dim=VOXELS_DIM, verbose=generator_cfg.get('verbose'), pad=generator_cfg.get('pad'))
         dev_generator = None
         test_generator = None
-            
+                        
     ### Prepare for Training
     
     logging.info('Num input = {}'.format(n_input))

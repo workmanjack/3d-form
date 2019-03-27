@@ -98,6 +98,14 @@ class ModelNet10(IndexedDataset):
         if shape:
             vox_data = np.reshape(vox_data, shape)
         return vox_data
+    
+    def filter_categories(self, categories):
+        df_filter = (self.df.category == categories[0])
+        for cat in categories[1:]:
+            df_filter = df_filter | (self.df.category == cat)
+        if df_filter is not None:
+            self.df = self.df[df_filter]
+        return
 
     def voxels_batchmaker(self, batch_size, voxels_dim, set_filter=None, verbose=False, pad=False):
         """
