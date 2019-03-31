@@ -1,12 +1,12 @@
 # project imports
 from utils import PROJECT_ROOT, read_json_data, flatten_dict, np_recon_loss, get_logger
 from data.voxels import read_voxel_array, convert_voxels_to_stl, plot_voxels
+from data import PROCESSED_DIR, MODELNET10_RECONS
 from models.voxel_vaegan import VoxelVaegan
 from data.modelnet10 import ModelNet10
 from data.thingi10k import Thingi10k
 from utils import read_json_data
 from data.stl import plot_mesh
-from data import PROCESSED_DIR
 from models import MODEL_DIR
 
 
@@ -25,6 +25,7 @@ import os
 VOXEL_DIM = 32
 VOXEL_THRESHOLD = 0.9
 get_logger()
+
 
 ### model to use for reconstruction
 
@@ -69,9 +70,11 @@ for i, (index, row) in enumerate(modelnet.df.iterrows()):
         rmin = np.min(recon_output)
         rmean = np.mean(recon_output)
         rloss = np_recon_loss(recon_input, recon_output)
-        recon_rows.append(list(row) + [rmax, rmin, rmean, rloss])
-        #recon_shaped = np.reshape(recon_output, [VOXEL_DIM, VOXEL_DIM, VOXEL_DIM])
+        recon_shaped = np.reshape(recon_output, [VOXEL_DIM, VOXEL_DIM, VOXEL_DIM])
+        recon_path = os.path.join(MODELNET10_RECONS, row['binvox'] + '.npy')
         #recon_print = recon_shaped > VOXEL_THRESHOLD
+        np.save(recon_path, recon_shaped)
+        recon_rows.append(list(row) + [rmax, rmin, rmean, rloss, recon_path])
         if i % 100 == 0:
             logging.info('Recons Processed = {} / {}'.format(i, modelnet_length))
     except Exception as exc:
@@ -80,7 +83,7 @@ for i, (index, row) in enumerate(modelnet.df.iterrows()):
 output_csv = os.path.join(PROCESSED_DIR, 'recons.csv')
 with open(output_csv, 'w', newline='') as csvfile:
     csvwriter = csv.writer(csvfile)
-    csvwriter.writerow(list(modelnet.df.columns) + ['max', 'min', 'mean', 'loss'])
+    csvwriter.writerow(list(modelnet.df.columns) + ['max', 'min', 'mean', 'loss', 'recon_path'])
     for row in recon_rows:
         csvwriter.writerow(row)
         

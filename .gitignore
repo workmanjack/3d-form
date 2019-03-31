@@ -3,6 +3,7 @@ data/external/*
 !data/external/Bear.stl
 data/raw/*
 data/processed/Thingi10k/voxels/*
+data/processed/ModelNet10/recons/*
 notebooks/_output/*
 notebooks/MNIST_data
 notebooks/experiments*

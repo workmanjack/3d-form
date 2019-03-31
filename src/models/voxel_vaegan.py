@@ -954,6 +954,11 @@ class VoxelVaegan():
         vecs.append(v2)
         return vecs
     
+    def encode(self, input_x):
+        result = self.sess.run(self.encoder, 
+            feed_dict={self._input_x: input_x, self._keep_prob: 1.0})
+        return result
+    
     def mashup(self, input_x1, input_x2, steps=9):
         """
         Use VAE to combine two objects
