@@ -1,0 +1,17 @@
+# good
+chair_0986_32_x0_z0.binvox
+toilet_0053_32_x0_z0.binvox
+night_stand_0104_32_x0_z0.binvox
+table_0229_32_x0_z0.binvox
+table_0407_32_x0_z0.binvox
+toilet_0173_32_x0_z0.binvox
+chair_0900_32_x0_z0.binvox
+sofa_0515_32_x0_z0.binvox
+table_0038_32_x0_z0.binvox
+chair_0807_32_x0_z0.binvox
+chair_0626_32_x0_z0.binvox
+sofa_0691_32_x0_z0.binvox
+# ok
+
+# bad
+dresser_0051_32_x0_z0.binvox

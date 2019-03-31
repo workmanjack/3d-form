@@ -915,17 +915,20 @@ class VoxelVaegan():
     def _random_latent(self):
         return tf.random_normal(tf.stack([self._batch_size, self.latent_dim]))
     
-    def random_latent_vector(self):
+    def random_latent_vector(self, mu, sig):
         """
         Create a latent vector for vaegan
         
         TODO: current architecture does not support this. enc_mu and enc_sig are dependent on 
         the input_x placeholder which gets passed through the encoder.
         """
-        rlatent = self._random_latent()
-        latent, mu, sig = self.sess.run((rlatent, self.enc_mu, self.enc_sig),
-                               feed_dict={self._input_x: np.zeros((1, 32, 32, 32, 1)), self._keep_prob: 1.0})
+        #latent = self._random_latent()
+        # above func returns a tensor - we want just the array
+        latent = np.random.normal(mu, sig, [1, self.latent_dim])
         z = mu + latent * np.exp(sig)
+
+        #latent, mu, sig = self.sess.run((rlatent, self.enc_mu, self.enc_sig),
+        #                       feed_dict={self._input_x: np.zeros((1, 32, 32, 32, 1)), self._keep_prob: 1.0})
         return z
 
     def latent_recon(self, latent_vector):

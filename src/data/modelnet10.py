@@ -86,17 +86,27 @@ class ModelNet10(IndexedDataset):
         voxels = self.get_voxels(random_sample['category'].iloc[0], random_sample['dataset'].iloc[0], filename)
         return filename, voxels
 
-    def get_voxels(self, category, dataset, voxel_file, verbose=False, shape=None):
-        # construct path
+    def get_voxels_path(self, category, dataset, voxel_file):
+        """
+        """
         vox_path = os.path.join(MODELNET10_DIR, category, dataset, voxel_file)
-        if verbose:
-            print('Voxel path: {}'.format(vox_path))
+        return vox_path
+    
+    def read_voxels(self, voxels_path, shape=None):
         # read in voxels
-        vox = read_voxel_array(vox_path)
+        vox = read_voxel_array(voxels_path)
         # convert from bool True/False to float 1/0 (tf likes floats)
         vox_data = vox.data.astype(np.float32)
         if shape:
             vox_data = np.reshape(vox_data, shape)
+        return vox_data
+        
+    def get_voxels(self, category, dataset, voxel_file, verbose=False, shape=None):
+        # construct path
+        vox_path = self.get_voxels_path(category, dataset, voxel_file)
+        if verbose:
+            print('Voxel path: {}'.format(vox_path))
+        vox_data = self.read_voxels(vox_path, shape=shape)
         return vox_data
     
     def filter_x_z(self, x, z):
