@@ -75,6 +75,7 @@ KNOWN_BAD_MODELNET10 = [
     'bed_0173_32_x0_z0.binvox',
     'bed_0156_32_x0_z0.binvox',
     'bed_0233_32_x0_z0.binvox',
+    'chair_0301_32_x0_z0.binvox',
 ]
 
 # some models are fine but are just not very interesting; we keep track here
@@ -160,7 +161,7 @@ KNOWN_NOT_INTERESTING_MODELNET10 = [
     'bed_0307_32_x0_z0.binvox',
     'bed_0394_32_x0_z0.binvox',
     'bed_0410_32_x0_z0.binvox',
-
+    'chair_0943_32_x0_z0.binvox',
 ]
 
 KNOWN_INTERESTING_MODELNET10 = [
@@ -235,7 +236,13 @@ KNOWN_INTERESTING_MODELNET10 = [
     'chair_0595_32_x0_z0.binvox',
     'chair_0017_32_x0_z0.binvox',
     'bed_0558_32_x0_z0.binvox',
-
+    'chair_0645_32_x0_z0.binvox',
+    'chair_0370_32_x0_z0.binvox',
+    'chair_0457_32_x0_z0.binvox',
+    'toilet_0397_32_x0_z0.binvox',
+    'toilet_0363_32_x0_z0.binvox',
+    'toilet_0209_32_x0_z0.binvox',
+    'toilet_0385_32_x0_z0.binvox'
 ]
 
 
