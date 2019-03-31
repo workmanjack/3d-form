@@ -943,6 +943,41 @@ class VoxelVaegan():
 
         return decoded
     
+    def interp(self, v1, v2, steps):
+        vecs = []
+        step = (v2-v1)/steps
+        for i in range(steps):
+            vecs.append(v1+step*i)
+        vecs.append(v2)
+        return vecs
+    
+    def mashup(self, input_x1, input_x2):
+        """
+        Use VAE to combine two objects
+        """
+        ops = tuple([self.encoder] + [self.decoder] + [op for name, op, _ in self._debug_ops])
+
+        # first 3d object
+        result_1 = self.sess.run(ops, 
+            feed_dict={self._input_x: input_x1, self._keep_prob: 1.0})
+        # second 3d object
+        result_2 = self.sess.run(ops, 
+            feed_dict={self._input_x: input_x2, self._keep_prob: 1.0})
+
+        # extract vector space for each
+        encoder_1 = result_1[0]
+        encoder_2 = result_2[0]
+        # add two vector space into one, use interpolation?
+        #new_vector = self.mashup_weight*encoder_1 + (1-self.mashup_weight)*encoder_2
+        new_vector = self.interp(encoder_1, encoder_2, 9)[1] # generate 9 arrays, use the 1 interpolated; should use variable
+                                                        # so that we could plot all of them, from similar to object 1 to object 2
+        # construct the object using derived vector space above
+        results = self.sess.run(self.decoder, 
+            feed_dict={self.encoder: new_vector})
+        decoded = results[0]
+
+        return decoded
+    
     def visualize_reconstruction(self, original_x, reconstructed_x, name=None):
         """
         This function was used to visualize the output of each epoch during training.

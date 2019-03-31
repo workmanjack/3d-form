@@ -1,4 +1,5 @@
 import logging.config
+import numpy as np
 import collections
 import subprocess
 import requests
@@ -207,4 +208,26 @@ def memory():
     py = psutil.Process(pid)
     memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
     return memoryUse
+
+
+def np_recon_loss(x, y):
+    """
+    Performs the same recon loss calc done in voxel_vae but with numpy
+    instead of tensorflow
+
+    Args:
+        x: np.array, original input object
+        y: np.array, reconstructed output object
+        
+    Returns:
+        float, reconstruction loss as computed in voxel_vae
+    """
+    clipped_input = np.clip(x, 1e-7, 1.0 - 1e-7)
+    clipped_output = np.clip(y, 1e-7, 1.0 - 1e-7)
+    bce = -(98.0 * clipped_input * np.log(clipped_output) + 2.0 * (1.0 - clipped_input) * np.log(1.0 - clipped_output)) / 100.0
+    # Voxel-Wise Reconstruction Loss 
+    # Note that the output values are clipped to prevent the BCE from evaluating log(0).
+    recon_loss = np.mean(bce, 1)
+    mean_recon = np.mean(recon_loss)
+    return mean_recon
             
