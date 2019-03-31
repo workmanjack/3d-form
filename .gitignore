@@ -20,6 +20,7 @@ models/voxel_vae
 models/voxel_vaegan
 models/voxel_vaegan1
 models/voxel_vae_toilet_200epochs_1
+models/voxel_vae*
 # data for tf tutorial of style transfer
 notebooks/vgg16/*
 
