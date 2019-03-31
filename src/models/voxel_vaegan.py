@@ -951,7 +951,7 @@ class VoxelVaegan():
         vecs.append(v2)
         return vecs
     
-    def mashup(self, input_x1, input_x2):
+    def mashup(self, input_x1, input_x2, steps=9):
         """
         Use VAE to combine two objects
         """
@@ -969,14 +969,16 @@ class VoxelVaegan():
         encoder_2 = result_2[0]
         # add two vector space into one, use interpolation?
         #new_vector = self.mashup_weight*encoder_1 + (1-self.mashup_weight)*encoder_2
-        new_vector = self.interp(encoder_1, encoder_2, 9)[1] # generate 9 arrays, use the 1 interpolated; should use variable
+        new_vectors = self.interp(encoder_1, encoder_2, steps) # generate 9 arrays, use the 1 interpolated; should use variable
                                                         # so that we could plot all of them, from similar to object 1 to object 2
-        # construct the object using derived vector space above
-        results = self.sess.run(self.decoder, 
-            feed_dict={self.encoder: new_vector})
-        decoded = results[0]
 
-        return decoded
+        # construct the object using derived vector space above
+        mashed = list()
+        for vec in new_vectors:
+            results = self.sess.run(self.decoder, feed_dict={self.encoder: vec})
+            mashed.append(results[0])
+
+        return np.asarray(mashed)
     
     def visualize_reconstruction(self, original_x, reconstructed_x, name=None):
         """

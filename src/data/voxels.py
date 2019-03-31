@@ -76,15 +76,16 @@ def plot_voxels(vox_data, title=None, figsize=(8,6), color='red'):
     return pyplot
 
 
-def convert_voxels_to_stl(vox_data):
+def convert_voxels_to_stl(vox_data, step_size=1):
 
     # Use marching cubes to obtain the surface mesh
-    verts, faces, normals, values = measure.marching_cubes_lewiner(vox_data, 0)
+    # https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.marching_cubes_lewiner
+    verts, faces, normals, values = measure.marching_cubes_lewiner(vox_data, step_size=step_size)
 
     # Display resulting triangular mesh using Matplotlib. This can also be done
     # with mayavi (see skimage.measure.marching_cubes_lewiner docstring).
-    fig = pyplot.figure(figsize=(10, 10))
-    ax = fig.add_subplot(111, projection='3d')
+    #fig = pyplot.figure(figsize=(10, 10))
+    #ax = fig.add_subplot(111, projection='3d')
     
     # return mesh vectors
     return verts[faces]

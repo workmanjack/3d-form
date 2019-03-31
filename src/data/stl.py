@@ -18,7 +18,7 @@ import stl
 stl.stl.MAX_COUNT = 2000000000
 
 
-def plot_mesh(mesh_vectors, title=None):
+def plot_mesh(mesh_vectors, title=None, facecolor='red', edgecolor='black'):
     """
     TODO: save to file instead of .show()?
     """
@@ -28,7 +28,11 @@ def plot_mesh(mesh_vectors, title=None):
     axes = mplot3d.Axes3D(figure)
 
     # add the vectors to the plot
-    axes.add_collection3d(Poly3DCollection(mesh_vectors))
+    # 3D Collection docs: https://matplotlib.org/api/_as_gen/mpl_toolkits.mplot3d.art3d.Poly3DCollection.html
+    collection3d = Poly3DCollection(mesh_vectors)
+    collection3d.set_edgecolor(edgecolor)
+    collection3d.set_facecolor(facecolor)
+    axes.add_collection3d(collection3d)
 
     # Auto scale to the mesh size
     scale = mesh_vectors.reshape([-1, 9]).flatten(-1)
@@ -38,7 +42,8 @@ def plot_mesh(mesh_vectors, title=None):
         pyplot.title(title, pad=20)
     
     # Show the plot to the screen
-    pyplot.show()
+    #pyplot.show()
+    return pyplot
 
 
 def read_mesh_vectors(stl_file):
