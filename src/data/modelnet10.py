@@ -165,7 +165,8 @@ KNOWN_NOT_INTERESTING_MODELNET10 = [
     'chair_0943_32_x0_z0.binvox',
     'toilet_0013_32_x0_z0.binvox',
     'toilet_0052_32_x0_z0.binvox',
-    'chair_0280_32_x0_z0.binvox'
+    'chair_0280_32_x0_z0.binvox',
+    'toilet_0434_32_x0_z0.binvox',
 ]
 
 KNOWN_INTERESTING_MODELNET10 = [
@@ -190,7 +191,6 @@ KNOWN_INTERESTING_MODELNET10 = [
     'sofa_0681_32_x0_z0.binvox',
     'chair_0747_32_x0_z0.binvox',
     'toilet_0276_32_x0_z0.binvox',
-    'toilet_0434_32_x0_z0.binvox',
     'toilet_0277_32_x0_z0.binvox',
     'toilet_0191_32_x0_z0.binvox',
     'toilet_0014_32_x0_z0.binvox',

@@ -101,6 +101,8 @@ def main():
                     logging.warning('object does not exist: {}'.format(obj2))
                     continue
                 
+                combos[obj1].append(obj2)
+                
                 # encode objs
                 input1 = read_voxel_array(obj1).data
                 latent1 = encode(obj1, input1, vaegan)
@@ -146,8 +148,8 @@ def main():
                 save_vectors_as_stl(stl_obj2, dest_obj2_stl)
                 logging.debug('dest_obj2_stl: {}'.format(dest_obj2_stl))
                 
-                logging.info('Completed {} <-> {}'.format(name1, name2))
                 count += 1
+                logging.info('Completed #{}: {} <-> {}'.format(count, name1, name2))
             
 
             except Exception as exc:
