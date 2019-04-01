@@ -31,7 +31,7 @@ import os
 
 
 DEST_DIR = os.path.join(PROCESSED_DIR, 'INTERESTING_COMBOS')
-
+DEST_DIR = '../../3d-form-output/combinations'
 
 #tf.reset_default_graph()
 VOXELS_DIM = 32
@@ -40,9 +40,8 @@ ROTATE_CATEGORIES = ['sofa', 'monitor', 'dresser']
 get_logger()
 
 
-def encode(obj1, vaegan):
-    input1 = read_voxel_array(obj1).data
-    if any(cat in obj1 for cat in ROTATE_CATEGORIES):
+def encode(path, input1, vaegan):
+    if any(cat in path for cat in ROTATE_CATEGORIES):
         input1 = np.rot90(input1)
     input1 = np.reshape(input1, (-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1))
     latent1 = vaegan.encode(input1)
@@ -103,30 +102,50 @@ def main():
                     continue
                 
                 # encode objs
-                latent1 = encode(obj1, vaegan)
-                latent2 = encode(obj2, vaegan)
+                input1 = read_voxel_array(obj1).data
+                latent1 = encode(obj1, input1, vaegan)
+                input2 = read_voxel_array(obj2).data
+                latent2 = encode(obj2, input2, vaegan)
                 
                 # combine and recon
                 mid = latent1 + latent2    
                 recon = vaegan.latent_recon(mid)
                 recon = np.reshape(recon, [32, 32, 32])
 
+                # baseline
+                baseline = input1 + input2
+                stl_baseline = convert_voxels_to_stl(baseline)
+                
                 # final form
                 recon_threshold = recon > .9
-                stl_data = convert_voxels_to_stl(recon_threshold)
+                stl_obj1 = convert_voxels_to_stl(np.reshape(input1, (32, 32, 32)))
+                stl_obj2 = convert_voxels_to_stl(np.reshape(input2, (32, 32, 32)))
+                stl_recon = convert_voxels_to_stl(recon_threshold)
                 
                 # write to destination
                 name1 = os.path.basename(os.path.splitext(obj1)[0])
                 name2 = os.path.basename(os.path.splitext(obj2)[0])
                 dest_obj = os.path.join(DEST_DIR, name1)
                 os.makedirs(dest_obj, exist_ok=True)
+                # combo stl
                 dest_stl = os.path.join(dest_obj, '{}__{}.stl'.format(name1, name2))
                 logging.debug('dest_stl: {}'.format(dest_stl))
+                save_vectors_as_stl(stl_recon, dest_stl)
+                # combo vox
                 dest_vox = os.path.join(dest_obj, '{}__{}.binvox'.format(name1, name2))
                 logging.debug('dest_vox: {}'.format(dest_vox))
-                save_vectors_as_stl(stl_data, dest_stl)
                 np.save(dest_vox, recon_threshold)
-
+                # baseline, obj1, obj2
+                dest_baseline_stl = dest_stl.replace('.stl', '.baseline.stl')
+                save_vectors_as_stl(stl_baseline, dest_baseline_stl)
+                logging.debug('dest_baseline_stl: {}'.format(dest_baseline_stl))
+                dest_obj1_stl = os.path.join(dest_obj, os.path.basename(os.path.splitext(obj1)[0]) + '.stl')
+                save_vectors_as_stl(stl_obj1, dest_obj1_stl)
+                logging.debug('dest_obj1_stl: {}'.format(dest_obj1_stl))
+                dest_obj2_stl = os.path.join(dest_obj, os.path.basename(os.path.splitext(obj2)[0]) + '.stl')
+                save_vectors_as_stl(stl_obj2, dest_obj2_stl)
+                logging.debug('dest_obj2_stl: {}'.format(dest_obj2_stl))
+                
                 logging.info('Completed {} <-> {}'.format(name1, name2))
                 count += 1
             
@@ -134,9 +153,6 @@ def main():
             except Exception as exc:
                 logging.exception(str(exc))
 
-            break
-
-        break
 
 if __name__ == '__main__':
     main()
