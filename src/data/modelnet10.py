@@ -76,6 +76,7 @@ KNOWN_BAD_MODELNET10 = [
     'bed_0156_32_x0_z0.binvox',
     'bed_0233_32_x0_z0.binvox',
     'chair_0301_32_x0_z0.binvox',
+    'chair_0865_32_x0_z0.binvox'
 ]
 
 # some models are fine but are just not very interesting; we keep track here
@@ -162,6 +163,9 @@ KNOWN_NOT_INTERESTING_MODELNET10 = [
     'bed_0394_32_x0_z0.binvox',
     'bed_0410_32_x0_z0.binvox',
     'chair_0943_32_x0_z0.binvox',
+    'toilet_0013_32_x0_z0.binvox',
+    'toilet_0052_32_x0_z0.binvox',
+    'chair_0280_32_x0_z0.binvox'
 ]
 
 KNOWN_INTERESTING_MODELNET10 = [
@@ -242,7 +246,10 @@ KNOWN_INTERESTING_MODELNET10 = [
     'toilet_0397_32_x0_z0.binvox',
     'toilet_0363_32_x0_z0.binvox',
     'toilet_0209_32_x0_z0.binvox',
-    'toilet_0385_32_x0_z0.binvox'
+    'toilet_0385_32_x0_z0.binvox',
+    'chair_0169_32_x0_z0.binvox',
+    'chair_0408_32_x0_z0.binvox',
+    'chair_0519_32_x0_z0.binvox',
 ]
 
 
@@ -308,9 +315,13 @@ class ModelNet10(IndexedDataset):
     def __init__(self, df, index, pctile):
         super().__init__(df, index, pctile)
         
-    def drop_bad_models(self, models=KNOWN_BAD_MODELNET10):
+    def drop_models(self, models):
         for m in models:
             self.df = self.df[~self.df['binvox'].str.contains(m)]
+        return
+    
+    def keep_models(self, models):
+        self.df = self.df[self.df['binvox'].isin(models)]
         return
         
     def get_random_voxels(self, voxels_dim):

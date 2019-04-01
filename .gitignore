@@ -4,6 +4,7 @@ data/external/*
 data/raw/*
 data/processed/Thingi10k/voxels/*
 data/processed/ModelNet10/recons/*
+data/processed/INTERESTING_COMBOS
 notebooks/_output/*
 notebooks/MNIST_data
 notebooks/experiments*

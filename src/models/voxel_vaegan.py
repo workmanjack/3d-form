@@ -959,7 +959,28 @@ class VoxelVaegan():
             feed_dict={self._input_x: input_x, self._keep_prob: 1.0})
         return result
     
-    def mashup(self, input_x1, input_x2, steps=9):
+    def mashup_vector_addition(self, input1, input2, weight1=1, weight2=1):
+        """
+        Uses the encoder to convert the two inputs into their latent vector representations,
+        applies weights if provided, sums the vectors, and decodes the result. In theory,
+        this produces the "combined" object.
+        
+        Args:
+            input1: np.array, shape of (-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1)
+            input2: np.array, shape of (-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1)
+            weight1: float, weight to apply to first input
+            weight2: float, weight to apply to second input
+        
+        Returns:
+            np.array, combined object
+        """
+        latent1 = self.encode(input1)
+        latent2 = self.encode(input2)
+        latent_sum = latent1 + latent2
+        recon = self.latent_recon(latent_sum)
+        return recon
+    
+    def mashup_interpolation(self, input_x1, input_x2, steps=9):
         """
         Use VAE to combine two objects
         """
