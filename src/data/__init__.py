@@ -22,3 +22,4 @@ MODELNET10_TOILET_NOROTATION_INDEX = os.path.join(PROCESSED_DIR, 'modelnet10_toi
 BINVOX = os.path.join(PROJECT_ROOT, 'src', 'data', 'binvox')
 MODELNET10_RECONS = os.path.join(PROCESSED_DIR, 'ModelNet10', 'recons')
 DOWNLOADED_STLS_DIR = os.path.join(EXTERNAL_DIR, 'downloaded_stls')
+DEMOS_DIR = os.path.join(PROJECT_ROOT, 'reports', 'demos')
