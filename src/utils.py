@@ -13,6 +13,7 @@ import os
 SRC_ROOT = os.path.realpath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.join(SRC_ROOT, '..')
 LOGS_DIR = os.path.join(SRC_ROOT, 'logs')
+DEMOS_DIR = os.path.join(PROJECT_ROOT, 'reports', 'demos')
 
         
 def get_logger(logname='root', verbosity=1):

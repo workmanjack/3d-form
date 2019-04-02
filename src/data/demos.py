@@ -1,4 +1,6 @@
 from data import DOWNLOADED_STLS_DIR, MODELNET10_DIR
+from utils import PROJECT_ROOT
+import os
 
 
 def stl_dir(obj):
@@ -10,7 +12,7 @@ def modelnet_dir(category, dataset, obj):
 
 
 def shapenet_dir(path):
-    os.path.join(PROJECT_ROOT, 'data/external/ShapeNetCore.v2', 'models/model_normalized.binvox')
+    return os.path.join(PROJECT_ROOT, 'data/external/ShapeNetCore.v2', path, 'models/model_normalized.binvox')
 
 
 GOOD_RECONS = [
@@ -24,8 +26,8 @@ GOOD_RECONS = [
     # sofa
     modelnet_dir('sofa', 'test', 'sofa_0757_32_x0_z0.binvox'),
     # monitor
-    modelnet_dir('monitor', 'train', 'monitor_0471_32_x0_z0.binvox'),
-    modelnet_dir('monitor', 'test', 'monitor_0531_32_x0_z0.binvox')
+    modelnet_dir('monitor', 'test', 'monitor_0471_32_x0_z0.binvox'),
+    modelnet_dir('monitor', 'test', 'monitor_0531_32_x0_z0.binvox'),
     # external
     stl_dir('CHIKEN.binvox'),
     stl_dir('chili.binvox'),
@@ -39,26 +41,26 @@ BAD_RECONS = [
     stl_dir('Bear.binvox'),
     stl_dir('Donkey.binvox'),
     # tough shape / sharp corners
-    modelnet10_dir('monitor', 'test', 'monitor_0496_32_x0_z0.binvox'),
-    modelnet10_dir('monitor', 'train', 'monitor_0405_32_x0_z0.binvox'),
+    modelnet_dir('monitor', 'test', 'monitor_0496_32_x0_z0.binvox'),
+    modelnet_dir('monitor', 'train', 'monitor_0405_32_x0_z0.binvox'),
     # boring shape
-    modelnet10_dir('monitor', 'train', 'monitor_0558_32_x0_z0.binvox'),
-    modelnet10_dir('dresser', 'train', 'dresser_0010_32_x0_z0.binvox'),
-    modelnet10_dir('sofa', 'train', 'sofa_0214_32_x0_z0.binvox'),
-    modelnet10_dir('bed', 'train', 'bed_0558_32_x0_z0.binvox'),
+    modelnet_dir('monitor', 'test', 'monitor_0558_32_x0_z0.binvox'),
+    modelnet_dir('dresser', 'train', 'dresser_0010_32_x0_z0.binvox'),
+    modelnet_dir('sofa', 'train', 'sofa_0214_32_x0_z0.binvox'),
+    modelnet_dir('bed', 'test', 'bed_0558_32_x0_z0.binvox'),
     # small gaps
-    modelnet10_dir('chair', 'train', 'chair_0118_32_x0_z0.binvox'),
-    modelnet10_dir('chair', 'train', 'chair_0637_32_x0_z0.binvox'),
+    modelnet_dir('chair', 'train', 'chair_0118_32_x0_z0.binvox'),
+    modelnet_dir('chair', 'train', 'chair_0637_32_x0_z0.binvox'),
     # bad voxelization
-    modelnet10_dir('chair', 'train', 'chair_0174_32_x0_z0.binvox'),
-    modelnet10_dir('bed', 'train', 'bed_0156_32_x0_z0.binvox')
+    modelnet_dir('chair', 'train', 'chair_0174_32_x0_z0.binvox'),
+    modelnet_dir('bed', 'train', 'bed_0156_32_x0_z0.binvox')
 ]
 
 GOOD_COMBOS = [
     (stl_dir('CHIKEN.binvox'), modelnet_dir('chair', 'train', 'chair_0169_32_x0_z0.binvox')),
-    (stl_dir('CHIKEN.binvox'), modelnet_dir('toilet', 'train', 'toilet_0385_32_x0_z0.binvox')),
-    (modelnet_dir('toilet', 'train', 'toilet_0382_32_x0_z0.binvox'), modelnet_dir('chair', 'train', 'chair_0645_32_x0_z0.binvox')),
-    (modelnet_dir('sofa', 'train', 'sofa_0051_32_x0_z0.binvox'), modelnet_dir('toilet', 'train', 'toilet_0397_32_x0_z0')),
+    (stl_dir('CHIKEN.binvox'), modelnet_dir('toilet', 'test', 'toilet_0385_32_x0_z0.binvox')),
+    (modelnet_dir('toilet', 'test', 'toilet_0382_32_x0_z0.binvox'), modelnet_dir('chair', 'train', 'chair_0645_32_x0_z0.binvox')),
+    (modelnet_dir('sofa', 'train', 'sofa_0051_32_x0_z0.binvox'), modelnet_dir('toilet', 'test', 'toilet_0397_32_x0_z0')),
     (modelnet_dir('chair', 'train', 'chair_0541_32_x0_z0'), modelnet_dir('chair', 'train', 'chair_0637_32_x0_z0')),
     (modelnet_dir('sofa', 'train', 'sofa_0573_32_x0_z0'), modelnet_dir('chair', 'train', 'chair_0519_32_x0_z0')),
     (stl_dir('CHIKEN.binvox'), stl_dir('911_high_poly.binvox')),
