@@ -30,7 +30,7 @@ def main():
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_100, limit=100)
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX_1000, limit=1000)
     #make_thingi10k_index(DATA_DIR, THINGI10K_INDEX)
-    make_modelnet10_index(MODELNET10_DIR, MODELNET10_TOILET_INDEX, categories=['toilet'], voxels_dim=64)
+    make_modelnet10_index(MODELNET10_DIR, MODELNET10_TOILET_INDEX, categories=['toilet'], voxels_dim=64, parallelize=True)
     #make_modelnet10_index(MODELNET10_DIR, MODELNET10_SOFA_INDEX, categories=['sofa'])
     #make_modelnet10_index(MODELNET10_DIR, MODELNET10_BATHTUB_INDEX, categories=['bathtub'])
     #make_modelnet10_index(MODELNET10_DIR, MODELNET10_BATHTUB_TOILET_INDEX, categories=['bathtub', 'toilet'])

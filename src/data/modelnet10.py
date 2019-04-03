@@ -1,11 +1,13 @@
 # project imports
 from data.voxels import voxelize_file, read_voxel_array
 from data.dataset import IndexedDataset
+from utils import SRC_ROOT, get_logger
 from data import MODELNET10_DIR
 
 
 # python packages
 import urllib.request
+import logging.config
 import pandas as pd
 import numpy as np
 import traceback
@@ -275,11 +277,12 @@ def process_modelnet10_model_dir(model_dir, voxels_dim=32):
     return voxel_files
 
 
-def make_modelnet10_index(root, output, categories=None, voxels_dim=32):
+def make_modelnet10_index(root, output, categories=None, voxels_dim=32, parallelize=False):
     """
     Args:
         root: str, root of ModelNet10 directory
     """
+    get_logger()
     modelnet_categories = os.listdir(root)
     if categories:
         # filter to only teh categories we want
@@ -287,24 +290,65 @@ def make_modelnet10_index(root, output, categories=None, voxels_dim=32):
     if 'README.txt' in modelnet_categories:
         modelnet_categories.remove('README.txt')
     models = list()
-    for category in modelnet_categories:
-        # test dir
-        test_dir = os.path.join(root, category, 'test')
-        models_processed = process_modelnet10_model_dir(test_dir, voxels_dim=voxels_dim)
-        models_processed = [[category, 'test'] + m for m in models_processed]
-        models += models_processed
-        # train dir
-        train_dir = os.path.join(root, category, 'train')
-        models_processed = process_modelnet10_model_dir(train_dir, voxels_dim=voxels_dim)
-        models_processed = [[category, 'train'] + m for m in models_processed]
-        models += models_processed
-    # output csv
-    with open(output, 'w') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        csvwriter.writerow(['category', 'dataset', 'model', 'binvox', 'dimension', 'x_rotations', 'z_rotations'])
-        for row in models:
-            csvwriter.writerow(row)
-    print('ModelNet10 csv written to {}'.format(output))
+    
+
+    if parallelize:
+
+        # launch subprocesses to parallelize and execute quicker
+        # https://stackoverflow.com/questions/16450788/python-running-subprocess-in-parallel
+
+        # the subprocesses won't return models processed, but they will be processed
+        # we can call the parallelize version once, wait till finish, make same
+        # call as not parallelized to build the index (this will go really quickly as
+        # it will not need to regen voxels)
+        
+        import subprocess
+        import tempfile
+        SCRIPT = os.path.join(SRC_ROOT, 'binvox_modelnet10_categories_parallel.py')
+
+        for category in modelnet_categories:
+
+            cmds = list()
+            test_dir = os.path.join(root, category, 'test')
+            cmds.append(['python3', SCRIPT, test_dir, str(voxels_dim)])
+            train_dir = os.path.join(root, category, 'train')
+            cmds.append(['python3', SCRIPT, train_dir, str(voxels_dim)])
+
+            processes = []
+            for cmd in cmds:
+                f = tempfile.TemporaryFile()
+                logging.info('launching cmd:\n{}'.format(cmd))
+                p = subprocess.Popen(cmd,stdout=f)
+                processes.append((p, f))
+
+            for cmd, (p, f) in zip(cmds, processes):
+                p.wait()
+                f.seek(0)
+                logging.info(f.read())
+                f.close()
+
+    else:
+
+        for category in modelnet_categories:
+            # test dir
+            test_dir = os.path.join(root, category, 'test')
+            models_processed = process_modelnet10_model_dir(test_dir, voxels_dim=voxels_dim)
+            models_processed = [[category, 'test'] + m for m in models_processed]
+            models += models_processed
+            # train dir
+            train_dir = os.path.join(root, category, 'train')
+            models_processed = process_modelnet10_model_dir(train_dir, voxels_dim=voxels_dim)
+            models_processed = [[category, 'train'] + m for m in models_processed]
+            models += models_processed
+        
+        # output csv
+        with open(output, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(['category', 'dataset', 'model', 'binvox', 'dimension', 'x_rotations', 'z_rotations'])
+            for row in models:
+                csvwriter.writerow(row)
+        print('ModelNet10 csv written to {}'.format(output))
+
     return
         
 
