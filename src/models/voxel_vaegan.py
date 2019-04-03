@@ -217,10 +217,25 @@ class VoxelVaegan():
                                      activation=tf.nn.relu,
                                      kernel_initializer=tf.initializers.glorot_uniform()))
             self._log_shape(conv4)
+            dense_input = conv4
+                        
+            # add an extra layer to process higher dims
+            if self.input_dim == 64:
+
+                conv5 = tf.layers.batch_normalization(tf.layers.conv3d(conv4,
+                         filters=64,
+                         kernel_size=[3, 3, 3],
+                         strides=(2, 2, 2),
+                         padding='valid',
+                         activation=tf.nn.relu,
+                         kernel_initializer=tf.initializers.glorot_uniform()))
+                self._log_shape(conv5)
+      
+                dense_input = conv5
 
             # Apply one fully-connected layer after Conv3d layers
             # tf dense layer: https://www.tensorflow.org/api_docs/python/tf/layers/dense
-            dense1 = tf.layers.batch_normalization(tf.layers.dense(conv4,
+            dense1 = tf.layers.batch_normalization(tf.layers.dense(dense_input,
                                  units=343,
                                  activation=tf.nn.elu,
                                  kernel_initializer=tf.initializers.glorot_uniform()))
@@ -281,7 +296,36 @@ class VoxelVaegan():
             reshape_z = tf.reshape(lrelu1, shape=(-1, 7, 7, 7, 1), name='reshape_z')
             self._log_shape(reshape_z)
 
-            conv1 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(reshape_z,
+            conv_input = reshape_z
+
+            # do some extra processing for higher dims
+            if self.input_dim == 64:
+
+                conv1_64 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(reshape_z,
+                                                   filters=64,
+                                                   kernel_size=[3, 3, 3],
+                                                   strides=(1, 1, 1),
+                                                   padding='same',
+                                                   activation=tf.nn.relu,
+                                                   use_bias=False,
+                                                   kernel_initializer=tf.initializers.glorot_uniform(),
+                                                   name='dec_conv1_64'))
+                self._log_shape(conv1_64)
+
+                conv2_64 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv1_64,
+                                                   filters=32,
+                                                   kernel_size=[3, 3, 3],
+                                                   strides=(2, 2, 2),
+                                                   padding='valid',
+                                                   activation=tf.nn.relu,
+                                                   use_bias=False,
+                                                   kernel_initializer=tf.initializers.glorot_uniform(),
+                                                   name='dec_conv2_64'))
+                self._log_shape(conv2_64)
+                
+                conv_input = conv2_64
+            
+            conv1 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv_input,
                                                filters=64,
                                                kernel_size=[3, 3, 3],
                                                strides=(1, 1, 1),
