@@ -275,7 +275,7 @@ def process_modelnet10_model_dir(model_dir, voxels_dim=32):
     return voxel_files
 
 
-def make_modelnet10_index(root, output, categories=None):
+def make_modelnet10_index(root, output, categories=None, voxels_dim=32):
     """
     Args:
         root: str, root of ModelNet10 directory
@@ -290,12 +290,12 @@ def make_modelnet10_index(root, output, categories=None):
     for category in modelnet_categories:
         # test dir
         test_dir = os.path.join(root, category, 'test')
-        models_processed = process_modelnet10_model_dir(test_dir)
+        models_processed = process_modelnet10_model_dir(test_dir, voxels_dim=voxels_dim)
         models_processed = [[category, 'test'] + m for m in models_processed]
         models += models_processed
         # train dir
         train_dir = os.path.join(root, category, 'train')
-        models_processed = process_modelnet10_model_dir(train_dir)
+        models_processed = process_modelnet10_model_dir(train_dir, voxels_dim=voxels_dim)
         models_processed = [[category, 'train'] + m for m in models_processed]
         models += models_processed
     # output csv
