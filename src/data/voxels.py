@@ -163,6 +163,7 @@ def voxelize_file(input_file, ext='stl', dest_dir=VOXELS_DIR, check_if_exists=Tr
         print('running -- {}'.format(' '.join(cmd)))
     try:
         subprocess.run(cmd, timeout=timeout)
+        #print('skipping')
     except subprocess.TimeoutExpired as texp:
         # marked as true because we want to track these and add them to the KNOWN_CANNOT_VOXELIZE list
         if True or verbose:
