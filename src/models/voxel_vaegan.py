@@ -19,16 +19,45 @@ np.random.seed(12)
 tf.set_random_seed(12)
 
 
+# https://databricks.com/tensorflow/using-a-gpu
+# we originally wrote this with tf 1.13
+# but need tf 1.9 for gpu, so here we switch some things around
+# FYI this is very lazy coding, but we need to get this out asap to graduate
+def use_cpu():
+    global DEVICE_NAME
+    DEVICE_NAME = "/cpu:0"
+    global GLOROT_INITIALIZER
+    GLOROT_INITIALIZER = tf.initializers.glorot_uniform
+    global REDUCE_MAX
+    REDUCE_MAX = tf.math.reduce_max
+    global REDUCE_MIN
+    REDUCE_MIN = tf.math.reduce_min
+    global REDUCE_MEAN
+    REDUCE_MEAN = tf.math.reduce_mean
+def use_gpu():
+    global DEVICE_NAME
+    DEVICE_NAME = "/gpu:0"
+    global GLOROT_INITIALIZER
+    GLOROT_INITIALIZER = tf.glorot_normal_initializer
+    global REDUCE_MAX
+    REDUCE_MAX = tf.reduce_max
+    global REDUCE_MIN
+    REDUCE_MIN = tf.reduce_min
+    global REDUCE_MEAN
+    REDUCE_MEAN = tf.reduce_mean
+
+
+
 class VoxelVaegan():
-    
+
     SCOPE_ENCODER = 'encoder'
     SCOPE_DECODER = 'decoder'
     SCOPE_DISCRIMINATOR = 'discriminator'
-    
+
     def __init__(self, input_dim, latent_dim, keep_prob, verbose=False, no_gan=False,
                  kl_div_loss_weight=5, recon_loss_weight=5e-4, ll_weight=.001, dec_weight=10,
                  debug=False, ckpt_dir='voxel_vaegan', tb_dir='tb', train_vae_cadence=1,
-                 train_gan_cadence=1, dis_noise=0, adaptive_lr=False):
+                 train_gan_cadence=1, dis_noise=0, adaptive_lr=False, gpu=False):
         """
         Args:
             input_dim: int, dimension of voxels to process
@@ -48,92 +77,98 @@ class VoxelVaegan():
             dis_noise: float, how much noise to apply to discriminator's decisions during training
             adaptive_lr: bool, flag to use adaptive learning rates or not (see train function)
 
-        """ 
+        """
         logging.info('Initializing VoxelVaegan')
-        # network and training params
-        self.input_dim = input_dim
-        self.latent_dim = latent_dim
-        self.keep_prob = keep_prob
-        self.verbose = verbose
-        self.no_gan = no_gan
-        self.debug = debug
-        self.kl_div_loss_weight = kl_div_loss_weight
-        self.recon_loss_weight = recon_loss_weight
-        self.ll_weight = ll_weight
-        self.dec_weight = dec_weight
-        self.train_vae_cadence = train_vae_cadence
-        self.train_gan_cadence = train_gan_cadence
-        self.step = 0
-        self.adaptive_lr = adaptive_lr
-        self._d_layers = None
-        
-        self._input_x = tf.placeholder(tf.float32, shape=(None, self.input_dim, self.input_dim, self.input_dim, 1))
-        self._keep_prob = tf.placeholder(dtype=tf.float32)
-        self._lr_enc = tf.placeholder(tf.float32, shape=[])
-        self._lr_dec = tf.placeholder(tf.float32, shape=[])
-        self._lr_dis = tf.placeholder(tf.float32, shape=[])
-
-        # record the learning rates
-        tf.summary.scalar('enc_current_lr', self._lr_enc)
-        tf.summary.scalar('dec_current_lr', self._lr_dec)
-        tf.summary.scalar('dis_current_lr', self._lr_dis)
-        
-        # add ops to this list as a tuple with (<op name>, <op>) to see them executed, returned, and printed
-        # to console during execution
-        self._debug_ops = list()
-        
-        # Construct the TensorFlow Graph
-        self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x)
-        self.decoder = self._make_decoder(self.encoder, name='vae')
-
-        if self.no_gan:
-            logging.info('Running VAE-GAN in VAE-Only Mode')
-            self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
-                                                                           self.enc_mu, self.enc_sig)
-
+        if gpu:
+            use_gpu()
         else:
-            # generate from noise
-            self.g_noise = self._make_decoder(self._random_latent(), name='noise')
-            # discriminate from noise, vae, input
-            with tf.variable_scope(self.SCOPE_DISCRIMINATOR) as dis_scope:
-                self.d_x_noise, self.d_x_noise_ll = self._make_discriminator(self.g_noise)
-            with tf.variable_scope(dis_scope, reuse=True):
-                self.d_x_vae, self.d_x_vae_ll = self._make_discriminator(self.decoder)
-            with tf.variable_scope(dis_scope, reuse=True):
-                self.d_x_real, self.d_x_real_ll = self._make_discriminator(self._input_x)
-            tf.summary.scalar('d_x_noise', tf.reduce_mean(self.d_x_noise), family='dis_losses')
-            tf.summary.scalar('d_x_vae', tf.reduce_mean(self.d_x_vae), family='dis_losses')
-            tf.summary.scalar('d_x_real', tf.reduce_mean(self.d_x_real), family='dis_losses')
-            tf.summary.scalar('d_x_noise_ll', tf.reduce_mean(self.d_x_noise_ll), family='dis_lls')
-            tf.summary.scalar('d_x_vae_ll', tf.reduce_mean(self.d_x_vae_ll), family='dis_lls')
-            tf.summary.scalar('d_x_real_ll', tf.reduce_mean(self.d_x_real_ll), family='dis_lls')
-            
-            self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.d_x_real, self.d_x_vae, self.d_x_noise)
-            
-            self.ll_loss = self._make_ll_loss(self.d_x_real_ll, self.d_x_vae_ll)
-            
-            self.dec_loss, self.dec_optim = self._make_decoder_loss(self.ll_loss, self.dis_loss)
-            self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
-                                                                           self.enc_mu, self.enc_sig, ll_loss=self.ll_loss)
+            use_cpu()
+        with tf.device(DEVICE_NAME):
+            # network and training params
+            self.input_dim = input_dim
+            self.latent_dim = latent_dim
+            self.keep_prob = keep_prob
+            self.verbose = verbose
+            self.no_gan = no_gan
+            self.debug = debug
+            self.kl_div_loss_weight = kl_div_loss_weight
+            self.recon_loss_weight = recon_loss_weight
+            self.ll_weight = ll_weight
+            self.dec_weight = dec_weight
+            self.train_vae_cadence = train_vae_cadence
+            self.train_gan_cadence = train_gan_cadence
+            self.step = 0
+            self.adaptive_lr = adaptive_lr
+            self._d_layers = None
+            self.gpu = gpu
 
-        self._log_vars_by_scope(self.SCOPE_ENCODER)
-        self._log_vars_by_scope(self.SCOPE_DECODER)
-        self._log_vars_by_scope(self.SCOPE_DISCRIMINATOR)
-            
-        # Initializing the tensor flow variables
-        init = tf.global_variables_initializer()
-        
-        # Setup Model Saving
-        self.ckpt_dir = ckpt_dir
-        self.tb_dir = os.path.join(self.ckpt_dir, tb_dir)
-        os.makedirs(tb_dir, exist_ok=True)
-        self.saver = tf.train.Saver()
-        self.recons_pre = list()
-        self.recons_post = list()
-        self.metrics = defaultdict(dict)
+            self._input_x = tf.placeholder(tf.float32, shape=(None, self.input_dim, self.input_dim, self.input_dim, 1))
+            self._keep_prob = tf.placeholder(dtype=tf.float32)
+            self._lr_enc = tf.placeholder(tf.float32, shape=[])
+            self._lr_dec = tf.placeholder(tf.float32, shape=[])
+            self._lr_dis = tf.placeholder(tf.float32, shape=[])
+
+            # record the learning rates
+            tf.summary.scalar('enc_current_lr', self._lr_enc)
+            tf.summary.scalar('dec_current_lr', self._lr_dec)
+            tf.summary.scalar('dis_current_lr', self._lr_dis)
+
+            # add ops to this list as a tuple with (<op name>, <op>) to see them executed, returned, and printed
+            # to console during execution
+            self._debug_ops = list()
+
+            # Construct the TensorFlow Graph
+            self.encoder, self.enc_mu, self.enc_sig = self._make_encoder(self._input_x)
+            self.decoder = self._make_decoder(self.encoder, name='vae')
+
+            if self.no_gan:
+                logging.info('Running VAE-GAN in VAE-Only Mode')
+                self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
+                                                                               self.enc_mu, self.enc_sig)
+
+            else:
+                # generate from noise
+                self.g_noise = self._make_decoder(self._random_latent(), name='noise')
+                # discriminate from noise, vae, input
+                with tf.variable_scope(self.SCOPE_DISCRIMINATOR) as dis_scope:
+                    self.d_x_noise, self.d_x_noise_ll = self._make_discriminator(self.g_noise)
+                with tf.variable_scope(dis_scope, reuse=True):
+                    self.d_x_vae, self.d_x_vae_ll = self._make_discriminator(self.decoder)
+                with tf.variable_scope(dis_scope, reuse=True):
+                    self.d_x_real, self.d_x_real_ll = self._make_discriminator(self._input_x)
+                tf.summary.scalar('d_x_noise', tf.reduce_mean(self.d_x_noise), family='dis_losses')
+                tf.summary.scalar('d_x_vae', tf.reduce_mean(self.d_x_vae), family='dis_losses')
+                tf.summary.scalar('d_x_real', tf.reduce_mean(self.d_x_real), family='dis_losses')
+                tf.summary.scalar('d_x_noise_ll', tf.reduce_mean(self.d_x_noise_ll), family='dis_lls')
+                tf.summary.scalar('d_x_vae_ll', tf.reduce_mean(self.d_x_vae_ll), family='dis_lls')
+                tf.summary.scalar('d_x_real_ll', tf.reduce_mean(self.d_x_real_ll), family='dis_lls')
+
+                self.dis_loss, self.dis_optim = self._make_discriminator_loss(self.d_x_real, self.d_x_vae, self.d_x_noise)
+
+                self.ll_loss = self._make_ll_loss(self.d_x_real_ll, self.d_x_vae_ll)
+
+                self.dec_loss, self.dec_optim = self._make_decoder_loss(self.ll_loss, self.dis_loss)
+                self.enc_loss, self.enc_optim, self.mean_recon, self.mean_kl = self._make_encoder_loss(self._input_x, self.decoder,
+                                                                               self.enc_mu, self.enc_sig, ll_loss=self.ll_loss)
+
+            self._log_vars_by_scope(self.SCOPE_ENCODER)
+            self._log_vars_by_scope(self.SCOPE_DECODER)
+            self._log_vars_by_scope(self.SCOPE_DISCRIMINATOR)
+
+            # Initializing the tensor flow variables
+            init = tf.global_variables_initializer()
+
+            # Setup Model Saving
+            self.ckpt_dir = ckpt_dir
+            self.tb_dir = os.path.join(self.ckpt_dir, tb_dir)
+            os.makedirs(tb_dir, exist_ok=True)
+            self.saver = tf.train.Saver()
+            self.recons_pre = list()
+            self.recons_post = list()
+            self.metrics = defaultdict(dict)
 
         # Launch the session
-        self.sess = tf.InteractiveSession()
+        self.sess = tf.InteractiveSession(config=tf.ConfigProto(log_device_placement=True, allow_soft_placement=True))
         self.sess.run(init)
 
     @classmethod
@@ -154,20 +189,21 @@ class VoxelVaegan():
                      train_vae_cadence=cfg_model.get('train_vae_cadence', 1),
                      train_gan_cadence=cfg_model.get('train_gan_cadence', 1),
                      dis_noise=cfg_model.get('dis_noise'),
-                     adaptive_lr=cfg_model.get('adaptive_lr'))
+                     adaptive_lr=cfg_model.get('adaptive_lr'),
+                     gpu=cfg_model.get('gpu', False))
         return vaegan
-        
+
     def _log_shape(self, tensor, name=None):
         if self.debug:
             if not name:
                 name = tensor.name
             logging.debug('{}: {}'.format(name, tensor.shape))
         return
-    
+
     def _make_encoder(self, input_x):
-        
+
         with tf.variable_scope(self.SCOPE_ENCODER, reuse=tf.AUTO_REUSE):
-        
+
             # tf conv3d: https://www.tensorflow.org/api_docs/python/tf/layers/conv3d
             # tf glorot init: https://www.tensorflow.org/api_docs/python/tf/glorot_uniform_initializer
             conv1 = tf.layers.batch_normalization(tf.layers.conv3d(input_x,
@@ -176,7 +212,7 @@ class VoxelVaegan():
                                      strides=(1, 1, 1),
                                      padding='valid',
                                      activation=tf.nn.relu,
-                                     kernel_initializer=tf.initializers.glorot_uniform()),
+                                     kernel_initializer=GLOROT_INITIALIZER()),
                                      name='enc_conv1')
             self._log_shape(conv1)
 
@@ -197,7 +233,7 @@ class VoxelVaegan():
                                      strides=(2, 2, 2),
                                      padding='same',
                                      activation=tf.nn.relu,
-                                     kernel_initializer=tf.initializers.glorot_uniform()))
+                                     kernel_initializer=GLOROT_INITIALIZER()))
             self._log_shape(conv2)
 
             conv3 = tf.layers.batch_normalization(tf.layers.conv3d(conv2,
@@ -206,7 +242,7 @@ class VoxelVaegan():
                                      strides=(1, 1, 1),
                                      padding='valid',
                                      activation=tf.nn.relu,
-                                     kernel_initializer=tf.initializers.glorot_uniform()))
+                                     kernel_initializer=GLOROT_INITIALIZER()))
             self._log_shape(conv3)
 
             conv4 = tf.layers.batch_normalization(tf.layers.conv3d(conv3,
@@ -215,10 +251,10 @@ class VoxelVaegan():
                                      strides=(2, 2, 2),
                                      padding='same',
                                      activation=tf.nn.relu,
-                                     kernel_initializer=tf.initializers.glorot_uniform()))
+                                     kernel_initializer=GLOROT_INITIALIZER()))
             self._log_shape(conv4)
             dense_input = conv4
-                        
+
             # add an extra layer to process higher dims
             if self.input_dim == 64:
 
@@ -228,9 +264,9 @@ class VoxelVaegan():
                          strides=(2, 2, 2),
                          padding='valid',
                          activation=tf.nn.relu,
-                         kernel_initializer=tf.initializers.glorot_uniform()))
+                         kernel_initializer=GLOROT_INITIALIZER()))
                 self._log_shape(conv5)
-      
+
                 dense_input = conv5
 
             # Apply one fully-connected layer after Conv3d layers
@@ -238,7 +274,7 @@ class VoxelVaegan():
             dense1 = tf.layers.batch_normalization(tf.layers.dense(dense_input,
                                  units=343,
                                  activation=tf.nn.elu,
-                                 kernel_initializer=tf.initializers.glorot_uniform()))
+                                 kernel_initializer=GLOROT_INITIALIZER()))
             self._log_shape(dense1)
 
             # Apply dropout
@@ -253,7 +289,7 @@ class VoxelVaegan():
                                  units=self.latent_dim,
                                  activation=None)
             self._log_shape(enc_sig)
-            
+
             # epsilon is a random draw from the latent space
             self._batch_size = tf.shape(dense1)[0]
             epsilon = self._random_latent()
@@ -265,11 +301,11 @@ class VoxelVaegan():
             tf.summary.scalar('enc_sig', tf.reduce_mean(enc_sig))
             tf.summary.scalar('enc_mu', tf.reduce_mean(enc_mu))
             tf.summary.scalar('enc_z', tf.reduce_mean(enc_z))
-            
+
         return enc_z, enc_mu, enc_sig
 
     def _make_decoder(self, input_z, name):
-        
+
         with tf.variable_scope(self.SCOPE_DECODER, reuse=tf.AUTO_REUSE):
 
             # There is some magic in the Example VAE that adds conditional input based on the
@@ -287,7 +323,7 @@ class VoxelVaegan():
             # conv3d_transpose: https://www.tensorflow.org/api_docs/python/tf/layers/conv3d_transpose
             dense1 = tf.layers.dense(input_z,
                                      units=343,
-                                     kernel_initializer=tf.initializers.glorot_uniform(),
+                                     kernel_initializer=GLOROT_INITIALIZER(),
                                      name='dec_dense1')
             self._log_shape(dense1)
             lrelu1 = tf.nn.relu(tf.layers.batch_normalization(dense1))
@@ -308,7 +344,7 @@ class VoxelVaegan():
                                                    padding='same',
                                                    activation=tf.nn.relu,
                                                    use_bias=False,
-                                                   kernel_initializer=tf.initializers.glorot_uniform(),
+                                                   kernel_initializer=GLOROT_INITIALIZER(),
                                                    name='dec_conv1_64'))
                 self._log_shape(conv1_64)
 
@@ -319,12 +355,12 @@ class VoxelVaegan():
                                                    padding='valid',
                                                    activation=tf.nn.relu,
                                                    use_bias=False,
-                                                   kernel_initializer=tf.initializers.glorot_uniform(),
+                                                   kernel_initializer=GLOROT_INITIALIZER(),
                                                    name='dec_conv2_64'))
                 self._log_shape(conv2_64)
-                
+
                 conv_input = conv2_64
-            
+
             conv1 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv_input,
                                                filters=64,
                                                kernel_size=[3, 3, 3],
@@ -332,7 +368,7 @@ class VoxelVaegan():
                                                padding='same',
                                                activation=tf.nn.relu,
                                                use_bias=False,
-                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               kernel_initializer=GLOROT_INITIALIZER(),
                                                name='dec_conv1'))
             self._log_shape(conv1)
 
@@ -343,7 +379,7 @@ class VoxelVaegan():
                                                padding='valid',
                                                activation=tf.nn.relu,
                                                use_bias=False,
-                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               kernel_initializer=GLOROT_INITIALIZER(),
                                                name='dec_conv2'))
             self._log_shape(conv2)
 
@@ -354,7 +390,7 @@ class VoxelVaegan():
                                                padding='same',
                                                activation=tf.nn.relu,
                                                use_bias=False,
-                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               kernel_initializer=GLOROT_INITIALIZER(),
                                                name='dec_conv3'))
             self._log_shape(conv3)
 
@@ -365,7 +401,7 @@ class VoxelVaegan():
                                                padding='valid',
                                                activation=tf.nn.relu,
                                                use_bias=False,
-                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               kernel_initializer=GLOROT_INITIALIZER(),
                                                name='dec_conv4'))
             self._log_shape(conv4)
 
@@ -377,26 +413,26 @@ class VoxelVaegan():
                                                strides=(1, 1, 1),
                                                padding='same',
                                                use_bias=False,
-                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               kernel_initializer=GLOROT_INITIALIZER(),
                                                name='dec_conv5')
             self._log_shape(conv5)
 
             decoded_output = tf.nn.sigmoid(conv5)
             #decoded_output = tf.clip_by_value(decoded_output, 1e-7, 1.0 - 1e-7)
-            tf.summary.scalar('max_decoded_output', tf.math.reduce_max(decoded_output), family='decoder_{}'.format(name))
-            tf.summary.scalar('min_decoded_output', tf.math.reduce_min(decoded_output), family='decoder_{}'.format(name))
-            tf.summary.scalar('mean_decoded_output', tf.math.reduce_mean(decoded_output), family='decoder_{}'.format(name))
+            tf.summary.scalar('max_decoded_output', REDUCE_MAX(decoded_output), family='decoder_{}'.format(name))
+            tf.summary.scalar('min_decoded_output', REDUCE_MIN(decoded_output), family='decoder_{}'.format(name))
+            tf.summary.scalar('mean_decoded_output', REDUCE_MEAN(decoded_output), family='decoder_{}'.format(name))
             self._log_shape(decoded_output)
 
         return decoded_output
-    
+
     def _make_discriminator(self, input_x):
         """
         Thank you: https://github.com/Spartey/3D-VAE-GAN-Deep-Learning-Project/blob/master/3D-VAE-WGAN/model.py
-        
+
         It does not look like the layers are being shared across discriminator calls:
         https://github.com/tensorflow/tensorflow/issues/20842
-        
+
         Solution: create the variables then call them for future discriminator tasks
         """
         self._log_shape(input_x, 'input_x')
@@ -457,35 +493,35 @@ class VoxelVaegan():
 
         lth_layer = tf.layers.batch_normalization(tf.layers.dense(flatten,
                                     units=1024,
-                                    kernel_initializer=tf.initializers.glorot_uniform(),
+                                    kernel_initializer=GLOROT_INITIALIZER(),
                                     activation=tf.nn.leaky_relu,
                                     name='dis_dense1_lth_layer'), name='dis_batchnorm_ll')
         self._log_shape(lth_layer)
 
         d_layer = tf.layers.dense(lth_layer,
                             units=1,
-                            kernel_initializer=tf.initializers.glorot_uniform(),
+                            kernel_initializer=GLOROT_INITIALIZER(),
                             name='dis_dense2_decision')
         self._log_shape(d_layer)
-        
+
         d_output = tf.nn.sigmoid(d_layer)
 
         return d_output, lth_layer
-    
+
     def _get_vars_by_scope(self, scope):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
-    
+
     def _log_vars_by_scope(self, scope):
         variables = self._get_vars_by_scope(scope)
         logging.debug('Vars for scope {}'.format(scope))
         for v in variables:
             logging.debug(v)
-    
+
     def _make_decoder_loss(self, ll_loss, dis_loss):
-        
+
         # old
         #dec_loss = -tf.reduce_mean(dis_fake_logits)
-        
+
         # Loss
         dec_loss = ll_loss * self.ll_weight + dis_loss
 
@@ -494,25 +530,25 @@ class VoxelVaegan():
         # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
         dec_optim = tf.train.AdamOptimizer(learning_rate=self._lr_dec, beta1=0.5).minimize(dec_loss, var_list=var_list)
         #dec_optim = tf.train.RMSPropOptimizer(learning_rate=self._lr_dec).minimize(dec_loss, var_list=var_list)
-        
-        tf.summary.scalar("dec_loss", dec_loss) 
-        
+
+        tf.summary.scalar("dec_loss", dec_loss)
+
         return dec_loss, dec_optim
 
     def _make_ll_loss(self, dis_input_ll, dis_dec_ll):
-        # Lth Layer Loss - the 'learned similarity measure'  
+        # Lth Layer Loss - the 'learned similarity measure'
         ll_loss = tf.reduce_mean(tf.reduce_sum(tf.square(dis_input_ll - dis_dec_ll)))
         tf.summary.scalar("ll_loss", ll_loss)
         return ll_loss
-    
+
     def _add_noise(self, value, noise_window):
         """
         Adds or subtracts a random value within noise_window to/from value
-        
+
         Args:
             value: float, value to add noise to
             noise_window: float, percentage window (example, 5%) of noise to add
-            
+
         Returns:
             float, value with noise
         """
@@ -523,7 +559,7 @@ class VoxelVaegan():
     def _make_discriminator_loss(self, d_x_real, d_x_vae, d_x_noise, noise_window=0):
         """
         Calculates the loss of the discriminator
-        
+
         Args:
             d_x_real: float, prediction of discriminator that the real input for this step is real
             d_x_vae: float, prediction of discriminator that the vae's output from the encoded real input for this step is real
@@ -545,7 +581,7 @@ class VoxelVaegan():
         #self._add_debug_op('dis_loss: d_x_noise', loss_noise)
         #self._add_debug_op('dis_loss: 1 - d_x_vae', tf.reduce_mean(1.0 - tf.clip_by_value(self._add_noise(d_x_vae, noise_window), 1e-5, 1.0)))
         #self._add_debug_op('dis_loss: 1 - d_x_noise', tf.reduce_mean(1.0 - tf.clip_by_value(self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
-        #d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)) + 
+        #d_loss = tf.reduce_mean(-1.*(tf.log(tf.clip_by_value(self._add_noise(d_x_real, noise_window), 1e-5, 1.0)) +
         #                            tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_vae, noise_window), 1e-5, 1.0))) +
         #                            tf.log(tf.clip_by_value(1.0 - self._add_noise(d_x_noise, noise_window), 1e-5, 1.0)))
         d_loss = tf.math.abs(2.0 * loss_real - (1 - loss_vae) - (1 - loss_noise))
@@ -559,18 +595,18 @@ class VoxelVaegan():
         tf.summary.scalar('d_loss', d_loss)
 
         return d_loss, d_optim
-    
+
     def _make_encoder_loss(self, enc_input, dec_output, z_mu, z_sig, ll_loss=None):
         """
         Info on loss in VAE:
           * https://stats.stackexchange.com/questions/332179/how-to-weight-kld-loss-vs-reconstruction-loss-in-variational-auto-encoder
-          
+
         Args:
             enc_input: tensor, input tensor into VAE
             dec_output: tensor, decoded output tensor from VAE
 
         Return:
-            float, 
+            float,
         """
         # Weighted binary cross-entropy for use in voxel loss. Allows weighting of false positives relative to false negatives.
         # Nominally set to strongly penalize false negatives
@@ -578,24 +614,24 @@ class VoxelVaegan():
         clipped_input = tf.clip_by_value(enc_input, 1e-7, 1.0 - 1e-7)
         clipped_output = tf.clip_by_value(dec_output, 1e-7, 1.0 - 1e-7)
         bce = -(98.0 * clipped_input * tf.log(clipped_output) + 2.0 * (1.0 - clipped_input) * tf.log(1.0 - clipped_output)) / 100.0
-        
-        # Voxel-Wise Reconstruction Loss 
+
+        # Voxel-Wise Reconstruction Loss
         # Note that the output values are clipped to prevent the BCE from evaluating log(0).
         recon_loss = tf.reduce_mean(bce, 1)
         mean_recon = tf.reduce_mean(recon_loss)
-   
+
         # original recon_loss mean squared error measurement:
         #recon_loss = tf.reduce_sum(tf.squared_difference(
         #    tf.reshape(dec_output, (-1, self.input_dim ** 3)),
         #    tf.reshape(self._input_x, (-1, self.input_dim ** 3))), 1)
-        
+
         # the best description of kl divergence for VAEs:
         # https://blog.fastforwardlabs.com/2016/08/22/under-the-hood-of-the-variational-autoencoder-in.html
         kl_divergence = -0.5 * tf.reduce_sum(1.0 + 2.0 * z_sig - z_mu ** 2 - tf.exp(2.0 * z_sig), 1)
         #kl_divergence = tf.reduce_sum(-0.5 * tf.reduce_sum(1 + z_sig) - tf.square(z_mu) - tf.exp(z_sig), 1)
         mean_kl = tf.reduce_mean(kl_divergence)
 
-        # tf reduce_mean: https://www.tensorflow.org/api_docs/python/tf/math/reduce_mean
+        # tf reduce_mean: https://www.tensorflow.org/api_docs/python/REDUCE_MEAN
         if self.no_gan:
             # if no gan, we include the reconstruction loss as a factor here
             loss = tf.reduce_mean(self.kl_div_loss_weight * kl_divergence + self.recon_loss_weight * recon_loss)
@@ -603,7 +639,7 @@ class VoxelVaegan():
             # otherwise, we use the discriminator's input
             #L_e = tf.clip_by_value(KL_loss*KL_param + LL_loss, -100, 100)
             loss = self.kl_div_loss_weight * mean_kl + ll_loss * self.ll_weight
-            
+
         #self._add_debug_op('encoder loss', loss)
 
         var_list = self._get_vars_by_scope(self.SCOPE_ENCODER)
@@ -613,10 +649,10 @@ class VoxelVaegan():
         # beta1 set to reduce training oscillation from https://arxiv.org/pdf/1511.06434.pdf
         optimizer = tf.train.AdamOptimizer(learning_rate=self._lr_enc, beta1=0.5).minimize(loss, var_list=var_list)
 
-        tf.summary.scalar("mean_kl", mean_kl) 
-        tf.summary.scalar("mean_recon", mean_recon) 
-        tf.summary.scalar("enc_loss", loss) 
-        
+        tf.summary.scalar("mean_kl", mean_kl)
+        tf.summary.scalar("mean_recon", mean_recon)
+        tf.summary.scalar("enc_loss", loss)
+
         return loss, optimizer, mean_recon, mean_kl
 
     def _add_debug_op(self, name, op, newline=True):
@@ -636,12 +672,12 @@ class VoxelVaegan():
     def _log_model_step_results(self, enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time):
         """
         Helper function for logging results from _model_step func
-        
+
         Note that there's probably a better way to do this (perhaps with a class
         to represent all expected losses), but for now we use this function just to
         avoid writing the same log logic for train/dev/test output
         """
-        logging.info("Enc Loss = {:.2f}, ".format(enc_loss) + 
+        logging.info("Enc Loss = {:.2f}, ".format(enc_loss) +
                      "KL Divergence = {:.2f}, ".format(kl) +
                      "Reconstruction Loss = {:.2f}, ".format(recon) +
                      "ll_loss = {:.2f}, ".format(ll_loss) +
@@ -659,10 +695,10 @@ class VoxelVaegan():
             'll_loss': float(ll_loss),
             'dis_loss': float(dis_loss),
             'dec_loss': float(dec_loss),
-            'elapsed_time': float(elapsed_time) 
+            'elapsed_time': float(elapsed_time)
         }
         return
-    
+
     def _train_recon_example(self, epoch, viz_data):
         """
         Generates a side-by-side reconstruction example during the training process
@@ -702,7 +738,7 @@ class VoxelVaegan():
         Credit: https://github.com/timsainb/Tensorflow-MultiGPU-VAE-GAN/blob/master/VAE-GAN-multi-gpu-celebA.ipynb
         """
         return 1 / (1 + math.exp(-(x + shift) * mult))
-    
+
     def _save_model_ckpt(self, epoch):
         # Save the variables to disk.
         save_path = self.saver.save(self.sess, os.path.join(self.ckpt_dir, "model_epoch-{}.ckpt".format(epoch)))
@@ -712,14 +748,14 @@ class VoxelVaegan():
             json.dump(self.metrics, fp)
         logging.info("Metrics saved in path: {}".format(metrics_json))
         return
-        
+
     def _model_step(self, feed_dict, step, summary_writer, summary_op, optim_ops=None, exec_ops=None, debug_ops=None):
         """
         Performs a single step of the model training process
-        
+
         Writes summary_op result with summary_writer, prints debug_ops results, and returns
         exec_ops results
-        
+
         Args:
             feed_dict: dict, model input tensorflow style
             step: int, id of current step
@@ -728,7 +764,7 @@ class VoxelVaegan():
             optim_ops: list of tf.tensors, the tf optimizers
             exec_ops: list of tf.tensors, all tf tensors to execute and return
             debug_ops: list of tf.tensors, debug ops
-            
+
         Returns:
             list, results of exec_ops
         """
@@ -752,18 +788,18 @@ class VoxelVaegan():
             debug_results = results[base:]
             # write debug ops
             self._log_debug_ops(debug_results)
-        
+
         # write to summary
         summary_writer.add_summary(summary, step)
 
         # only return the execs (the loss values)
         return exec_results
-    
+
     def train(self, train_generator, dev_generator=None, test_generator=None, epochs=10, input_repeats=1, display_step=1,
               save_step=1, viz_data=None, dev_step=10, enc_lr=0.0001, dec_lr=0.0001, dis_lr=0.0001):
-        
+
         start = time.time()
-        
+
         train_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'train'), self.sess.graph)
         dev_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'dev'), self.sess.graph)
         test_writer = tf.summary.FileWriter(os.path.join(self.tb_dir, 'test'), self.sess.graph)
@@ -780,7 +816,7 @@ class VoxelVaegan():
             exec_ops = exec_ops + [self.ll_loss, self.dis_loss, self.dec_loss, self.d_x_real, self.d_x_vae]
         debug_ops = [op for name, op, _ in self._debug_ops]
         epoch_optim_ops = optim_ops
-        
+
         d_real = .5
         d_fake = .5
 
@@ -791,7 +827,7 @@ class VoxelVaegan():
 
             logging.info("Epoch: {}, Elapsed Time: {:.2f}".format(epoch, elapsed_time(start)))
             batch_progress = 0
-            
+
             if not self.no_gan:
                 # if gan is enabled, set optimizers for this epoch according to cadence
                 epoch_optim_ops = []
@@ -804,7 +840,7 @@ class VoxelVaegan():
 
             ### Training Loop ###
             for batch_num, batch in enumerate(train_generator()):
-                
+
                 if self.verbose:
                     # keep track of how many inputs we have
                     if epoch == 0:
@@ -814,7 +850,7 @@ class VoxelVaegan():
 
                     logging.debug('Epoch: {} / {}, Batch: {} ({} / {}), Elapsed time: {:.2f} mins'.format(
                         epoch, epochs, batch_num, batch_progress, inputs, elapsed_time(start)))
-                                
+
                 # adaptive learning rate
                 enc_current_lr = enc_lr
                 dec_current_lr = dec_lr
@@ -849,9 +885,9 @@ class VoxelVaegan():
 
                 if self.verbose:
                     self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
-                    
+
                 logging.info('Memory Use (GB): {}'.format(memory()))
-                
+
             self._save_model_step_results(epoch, enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
 
             ### Save Model Checkpoint ###
@@ -866,9 +902,9 @@ class VoxelVaegan():
             ### Evaluate Dev Dataset ###
             if dev_generator and (epoch + 1) % dev_step == 0:
                 logging.info('Evaluating Dev')
-                
+
                 for batch_num, batch in enumerate(dev_generator()):
-                    
+
                     #merge = tf.summary.merge_all()
                     results = self._model_step(
                        feed_dict={self._input_x: batch,
@@ -886,17 +922,17 @@ class VoxelVaegan():
                         ll_loss = -999
                         dis_loss = -999
                         dec_loss = -999
-                        
+
                     else:
                         enc_loss, kl, recon, ll_loss, dis_loss, dec_loss = results
                     self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
-                
+
         ### Evaluate Test Dataset ###
         if test_generator:
             logging.info('Evaluating Test')
 
             for batch_num, batch in enumerate(test_generator()):
-                    
+
                     #merge = tf.summary.merge_all()
                     results = self._model_step(
                        feed_dict={self._input_x: batch,
@@ -917,53 +953,53 @@ class VoxelVaegan():
                     else:
                         enc_loss, kl, recon, ll_loss, dis_loss, dec_loss = results
                     self._log_model_step_results(enc_loss, kl, recon, ll_loss, dis_loss, dec_loss, elapsed_time(start))
-            
+
         return
-    
+
     def restore(self, model_ckpt):
         self.saver.restore(self.sess, model_ckpt)
         return
-    
+
     def close(self):
         self.sess.close()
         return
-            
+
     def reconstruct(self, input_x):
         """
         Use VAE to reconstruct given data
         """
         ops = tuple([self.decoder] + [op for name, op, _ in self._debug_ops])
-                    
-        results = self.sess.run(ops, 
+
+        results = self.sess.run(ops,
             feed_dict={self._input_x: input_x, self._keep_prob: 1.0})
-        
+
         decoded = results[0]
         self._log_debug_ops(results[1:])
-                    
+
         return decoded
-    
+
     def discriminate(self, input_x, discriminator_op=None):
         if discriminator_op is None:
             discriminator_op = self.d_x_real
         print('discriminator_op: {}'.format(discriminator_op))
         ops = tuple([discriminator_op] + [op for name, op, _ in self._debug_ops])
-                    
-        results = self.sess.run(ops, 
+
+        results = self.sess.run(ops,
             feed_dict={self._input_x: input_x, self._keep_prob: 1.0})
-        
+
         discriminated = results[0]
         self._log_debug_ops(results[1:])
-                    
+
         return discriminated[0][0]
-    
+
     def _random_latent(self):
         return tf.random_normal(tf.stack([self._batch_size, self.latent_dim]))
-    
+
     def random_latent_vector(self, mu, sig):
         """
         Create a latent vector for vaegan
-        
-        TODO: current architecture does not support this. enc_mu and enc_sig are dependent on 
+
+        TODO: current architecture does not support this. enc_mu and enc_sig are dependent on
         the input_x placeholder which gets passed through the encoder.
         """
         #latent = self._random_latent()
@@ -979,17 +1015,17 @@ class VoxelVaegan():
         """
         Decode an object from the provided latent vector
         """
-        
+
         ops = tuple([self.decoder] + [op for name, op, _ in self._debug_ops])
 
-        results = self.sess.run(self.decoder, 
+        results = self.sess.run(self.decoder,
             feed_dict={self.encoder: latent_vector})
-        
+
         decoded = results[0]
         self._log_debug_ops(results[1:])
 
         return decoded
-    
+
     def interp(self, v1, v2, steps):
         vecs = []
         step = (v2-v1)/steps
@@ -997,24 +1033,24 @@ class VoxelVaegan():
             vecs.append(v1+step*i)
         vecs.append(v2)
         return vecs
-    
+
     def encode(self, input_x):
-        result = self.sess.run(self.encoder, 
+        result = self.sess.run(self.encoder,
             feed_dict={self._input_x: input_x, self._keep_prob: 1.0})
         return result
-    
+
     def mashup_vector_addition(self, input1, input2, weight1=1, weight2=1):
         """
         Uses the encoder to convert the two inputs into their latent vector representations,
         applies weights if provided, sums the vectors, and decodes the result. In theory,
         this produces the "combined" object.
-        
+
         Args:
             input1: np.array, shape of (-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1)
             input2: np.array, shape of (-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1)
             weight1: float, weight to apply to first input
             weight2: float, weight to apply to second input
-        
+
         Returns:
             np.array, combined object
         """
@@ -1023,7 +1059,7 @@ class VoxelVaegan():
         latent_sum = latent1 + latent2
         recon = self.latent_recon(latent_sum)
         return recon
-    
+
     def mashup_interpolation(self, input_x1, input_x2, steps=9):
         """
         Use VAE to combine two objects
@@ -1031,10 +1067,10 @@ class VoxelVaegan():
         ops = tuple([self.encoder] + [self.decoder] + [op for name, op, _ in self._debug_ops])
 
         # first 3d object
-        result_1 = self.sess.run(ops, 
+        result_1 = self.sess.run(ops,
             feed_dict={self._input_x: input_x1, self._keep_prob: 1.0})
         # second 3d object
-        result_2 = self.sess.run(ops, 
+        result_2 = self.sess.run(ops,
             feed_dict={self._input_x: input_x2, self._keep_prob: 1.0})
 
         # extract vector space for each
@@ -1052,7 +1088,7 @@ class VoxelVaegan():
             mashed.append(results[0])
 
         return np.asarray(mashed)
-    
+
     def visualize_reconstruction(self, original_x, reconstructed_x, name=None):
         """
         This function was used to visualize the output of each epoch during training.
