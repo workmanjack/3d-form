@@ -15,6 +15,7 @@ __pycache__
 *.sublime-workspace
 *.ipynb_checkpoints
 notebooks/cynthia/*
+reports/demos/experiment_review
 # ignore until ready to share
 models/stl_rnn
 models/stl_vae

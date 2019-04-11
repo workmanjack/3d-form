@@ -18,13 +18,13 @@ import stl
 stl.stl.MAX_COUNT = 2000000000
 
 
-def plot_mesh(mesh_vectors, title=None, facecolor='red', edgecolor='black'):
+def plot_mesh(mesh_vectors, title=None, facecolor='red', edgecolor='black', figsize=(8, 6)):
     """
     TODO: save to file instead of .show()?
     """
 
     # Create a new plot
-    figure = pyplot.figure()
+    figure = pyplot.figure(figsize=figsize)
     axes = mplot3d.Axes3D(figure)
 
     # add the vectors to the plot

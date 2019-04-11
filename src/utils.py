@@ -14,6 +14,7 @@ SRC_ROOT = os.path.realpath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.join(SRC_ROOT, '..')
 LOGS_DIR = os.path.join(SRC_ROOT, 'logs')
 DEMOS_DIR = os.path.join(PROJECT_ROOT, 'reports', 'demos')
+EXPERIMENT_FIG_DIR = os.path.join(DEMOS_DIR, 'experiment_review')
 
         
 def get_logger(logname='root', verbosity=1):
@@ -242,4 +243,23 @@ def np_recon_loss(x, y):
     recon_loss = np.mean(bce, 1)
     mean_recon = np.mean(recon_loss)
     return mean_recon
-            
+
+
+def unique_savefig_path(name, root=EXPERIMENT_FIG_DIR):
+    """
+    Creates a guaranteed unique path for you to save your reconstruction at
+    
+    Args:
+        name: str, name of fig
+        
+    Returns:
+        str, name plus a unique identifier based on preexisting saved figs
+    """
+    root_path = os.path.join(root, name + '.png')
+    for x in range(9999):
+        x_path = root_path.replace('.png', '_{}.png'.format(x))
+        if not os.path.exists(x_path):
+            # found one!
+            break
+    return x_path
+    
