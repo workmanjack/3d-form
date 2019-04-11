@@ -104,6 +104,17 @@ def read_json_data(path, verbose=False):
         print('{} does not exist'.format(path))
     return data
 
+
+def read_file_contents(path, lines=False):
+    contents = None
+    with open(path, 'r') as f:
+        if lines:
+            contents = f.readlines()
+        else:
+            contents = f.read()
+    return contents
+
+
 def dataframe_pctile_slice(df, col, pctile):
     return df[df[col] < df[col].quantile(pctile)]
 
