@@ -259,15 +259,24 @@ class VoxelVaegan():
             if self.input_dim == 64:
 
                 conv5 = tf.layers.batch_normalization(tf.layers.conv3d(conv4,
-                         filters=64,
+                         filters=128,
                          kernel_size=[3, 3, 3],
-                         strides=(2, 2, 2),
+                         strides=(1, 1, 1),
                          padding='valid',
                          activation=tf.nn.relu,
                          kernel_initializer=GLOROT_INITIALIZER()))
                 self._log_shape(conv5)
 
-                dense_input = conv5
+                conv6 = tf.layers.batch_normalization(tf.layers.conv3d(conv5,
+                         filters=256,
+                         kernel_size=[3, 3, 3],
+                         strides=(2, 2, 2),
+                         padding='valid',
+                         activation=tf.nn.relu,
+                         kernel_initializer=GLOROT_INITIALIZER()))
+                self._log_shape(conv6)
+
+                dense_input = conv6
 
             # Apply one fully-connected layer after Conv3d layers
             # tf dense layer: https://www.tensorflow.org/api_docs/python/tf/layers/dense
@@ -338,7 +347,7 @@ class VoxelVaegan():
             if self.input_dim == 64:
 
                 conv1_64 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(reshape_z,
-                                                   filters=64,
+                                                   filters=256,
                                                    kernel_size=[3, 3, 3],
                                                    strides=(1, 1, 1),
                                                    padding='same',
@@ -349,7 +358,7 @@ class VoxelVaegan():
                 self._log_shape(conv1_64)
 
                 conv2_64 = tf.layers.batch_normalization(tf.layers.conv3d_transpose(conv1_64,
-                                                   filters=32,
+                                                   filters=128,
                                                    kernel_size=[3, 3, 3],
                                                    strides=(2, 2, 2),
                                                    padding='valid',

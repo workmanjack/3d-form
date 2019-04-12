@@ -34,7 +34,7 @@ DEST_DIR = os.path.join(PROCESSED_DIR, 'INTERESTING_COMBOS')
 DEST_DIR = '../../3d-form-output/combinations'
 
 #tf.reset_default_graph()
-VOXELS_DIM = 32
+VOXELS_DIM = 64
 VOXEL_THRESHOLD = 0.9
 ROTATE_CATEGORIES = ['sofa', 'monitor', 'dresser']
 get_logger()
@@ -52,10 +52,9 @@ def main():
 
     ### model to use for reconstruction
 
-    vae_modelnet10 = '/home/jcworkma/jack/3d-form/models/voxel_vae_modelnet10_200epochs_1'
-    model_root = os.path.join(PROJECT_ROOT, vae_modelnet10)
+    model_root = '/home/jcworkma/jack/3d-form/models/voxel_vae_modelnet10_64_130epochs'
     model_cfg = read_json_data(os.path.join(model_root, 'cfg.json'))
-    model_ckpt = os.path.join(model_root, 'model_epoch-124.ckpt')
+    model_ckpt = os.path.join(model_root, 'model_epoch-129.ckpt')
     #model_ckpt = os.path.join(model_root, 'model_epoch-_end.ckpt')
     logging.info('model_cfg: {}'.format(model_cfg))
     logging.info('model_ckpt: {}'.format(model_ckpt))
@@ -77,7 +76,7 @@ def main():
     modelnet.df['vox_path'] = MODELNET10_DIR + '/' + modelnet.df['category'] + '/' + modelnet.df['dataset'] + '/' + modelnet.df['binvox']
     logging.info('ModelNet categories to process: {}'.format(modelnet.df.category.unique()))
     logging.info('ModelNet objects to process = {}'.format(modelnet_length))
-    downloaded_stls = [os.path.join(DOWNLOADED_STLS_DIR, x) for x in os.listdir(DOWNLOADED_STLS_DIR) if '.binvox' in x]
+    downloaded_stls = [os.path.join(DOWNLOADED_STLS_DIR, x) for x in os.listdir(DOWNLOADED_STLS_DIR) if '{}.binvox'.format('' if VOXELS_DIM == 32 else '_{}'.format(VOXELS_DIM)) in x]
     logging.info('Downloaded STLs to process: {}'.format(len(downloaded_stls)))
     master_list = list(modelnet.df['vox_path']) + downloaded_stls
     logging.info('len(master_list) = {}'.format(len(master_list)))
@@ -104,15 +103,17 @@ def main():
                 combos[obj1].append(obj2)
                 
                 # encode objs
+                print(obj1)
                 input1 = read_voxel_array(obj1).data
-                latent1 = encode(obj1, input1, vaegan)
+                latent1 = encode(obj1, input1, vaegan, VOXELS_DIM)
+                print(obj2)
                 input2 = read_voxel_array(obj2).data
-                latent2 = encode(obj2, input2, vaegan)
+                latent2 = encode(obj2, input2, vaegan, VOXELS_DIM)
                 
                 # combine and recon
                 mid = latent1 + latent2    
                 recon = vaegan.latent_recon(mid)
-                recon = np.reshape(recon, [32, 32, 32])
+                recon = np.reshape(recon, [VOXELS_DIM, VOXELS_DIM, VOXELS_DIM])
 
                 # baseline
                 baseline = input1 + input2
@@ -120,8 +121,8 @@ def main():
                 
                 # final form
                 recon_threshold = recon > .9
-                stl_obj1 = convert_voxels_to_stl(np.reshape(input1, (32, 32, 32)))
-                stl_obj2 = convert_voxels_to_stl(np.reshape(input2, (32, 32, 32)))
+                stl_obj1 = convert_voxels_to_stl(np.reshape(input1, (VOXELS_DIM, VOXELS_DIM, VOXELS_DIM)))
+                stl_obj2 = convert_voxels_to_stl(np.reshape(input2, (VOXELS_DIM, VOXELS_DIM, VOXELS_DIM)))
                 stl_recon = convert_voxels_to_stl(recon_threshold)
                 
                 # write to destination

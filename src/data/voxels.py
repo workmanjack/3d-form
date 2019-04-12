@@ -45,9 +45,11 @@ KNOWN_CANNOT_VOXELIZE_THINGI10K = [
 ]
 
 
-def read_voxel_array(vox_file):
+def read_voxel_array(vox_file, array=False):
     with open(vox_file, 'rb') as f:
         vox = read_as_3d_array(f)
+        if array:
+            vox = vox.data
     return vox
 
 
