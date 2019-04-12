@@ -19,6 +19,9 @@ import csv
 import os
 
 
+VOXELS_DIM = 64
+
+
 # some models either were bad to begin with or did not convert well
 # to voxels; we keep track of those here
 KNOWN_BAD_MODELNET10 = [
@@ -80,6 +83,7 @@ KNOWN_BAD_MODELNET10 = [
     'chair_0301_32_x0_z0.binvox',
     'chair_0865_32_x0_z0.binvox'
 ]
+KNOWN_BAD_MODELNET10 = [x.replace('_32_', '_{}_'.format(VOXELS_DIM)) for x in KNOWN_BAD_MODELNET10]
 
 # some models are fine but are just not very interesting; we keep track here
 KNOWN_NOT_INTERESTING_MODELNET10 = [
@@ -170,6 +174,7 @@ KNOWN_NOT_INTERESTING_MODELNET10 = [
     'chair_0280_32_x0_z0.binvox',
     'toilet_0434_32_x0_z0.binvox',
 ]
+KNOWN_NOT_INTERESTING_MODELNET10 = [x.replace('_32_', '_{}_'.format(VOXELS_DIM)) for x in KNOWN_NOT_INTERESTING_MODELNET10]
 
 KNOWN_INTERESTING_MODELNET10 = [
     'toilet_0375_32_x0_z0.binvox',
@@ -253,6 +258,7 @@ KNOWN_INTERESTING_MODELNET10 = [
     'chair_0408_32_x0_z0.binvox',
     'chair_0519_32_x0_z0.binvox',
 ]
+KNOWN_INTERESTING_MODELNET10 = [x.replace('_32_', '_{}_'.format(VOXELS_DIM)) for x in KNOWN_INTERESTING_MODELNET10]
 
 
 def process_modelnet10_model_dir(model_dir, voxels_dim=32):

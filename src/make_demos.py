@@ -31,13 +31,13 @@ import os
 
 
 #tf.reset_default_graph()
-VOXELS_DIM = 32
-VOXEL_THRESHOLD = 0.9
-ROTATE_CATEGORIES = ['sofa', 'monitor', 'dresser']
+VOXELS_DIM = 64
+#VOXEL_THRESHOLD = 0.9
+#ROTATE_CATEGORIES = ['sofa', 'monitor', 'dresser']
 get_logger()
 
 
-def combine_and_save_objects(obj1, obj2, dest_dir, vaegan):
+def combine_and_save_objects(obj1, obj2, dest_dir, vaegan, voxels_dim=32):
     """
     Returns:
         str, combo name of objects processed
@@ -50,8 +50,8 @@ def combine_and_save_objects(obj1, obj2, dest_dir, vaegan):
     path_voxels2 = os.path.join(basedir2, name2 + '.binvox')
     
     # generate recons if we do not have already
-    recon_and_save_object(obj1, dest_dir, vaegan)
-    recon_and_save_object(obj2, dest_dir, vaegan)
+    recon_and_save_object(obj1, dest_dir, vaegan, voxels_dim)
+    recon_and_save_object(obj2, dest_dir, vaegan, voxels_dim)
 
     # prepare to save
     name_combo = '{}.{}'.format(name1, name2)
@@ -66,14 +66,14 @@ def combine_and_save_objects(obj1, obj2, dest_dir, vaegan):
     
     # encode objs
     input1 = read_voxel_array(path_voxels1).data
-    latent1 = encode(obj1, input1, vaegan)
+    latent1 = encode(obj1, input1, vaegan, voxels_dim)
     input2 = read_voxel_array(path_voxels2).data
-    latent2 = encode(obj2, input2, vaegan)
+    latent2 = encode(obj2, input2, vaegan, voxels_dim)
 
     # combine and recon
     mid = latent1 + latent2    
     recon_voxels = vaegan.latent_recon(mid)
-    recon_voxels = np.reshape(recon_voxels, [32, 32, 32])
+    recon_voxels = np.reshape(recon_voxels, [voxels_dim, voxels_dim, voxels_dim])
 
     # baseline
     baseline_voxels = input1 + input2
@@ -97,7 +97,7 @@ def combine_and_save_objects(obj1, obj2, dest_dir, vaegan):
     return name_combo
 
 
-def recon_and_save_object(obj, dest_dir, vaegan):
+def recon_and_save_object(obj, dest_dir, vaegan, voxels_dim=32):
     """
     Assumes that obj is an stl or binvox file and that accompanying stl
     or binvox file is sitting next to it in same dir
@@ -115,13 +115,18 @@ def recon_and_save_object(obj, dest_dir, vaegan):
     stl_ext = '.stl'
     path_stl = os.path.join(basedir, name + '.stl')
     if not os.path.exists(path_stl):
-        # warning: a little hacky -- we assume name scheme for the modelnet shapes
-        path_stl = path_stl.replace('_32_x0_z0.stl', '.off')
-        stl_ext = '.off'
-        # and another hack to handle ShapeNet
-        if not os.path.exists(path_stl):
-            path_stl = os.path.join(basedir, 'model_normalized.obj')
-            stl_ext = '.obj'
+        # warning: a little hacky -- check if this has _64 on the end for downloaded_stls
+        tmp_stl = path_stl.replace('_{}.'.format(voxels_dim), '.')
+        if os.path.exists(tmp_stl):
+            path_stl = tmp_stl
+        else:
+            # warning: also a little hacky -- we assume name scheme for the modelnet shapes
+            path_stl = path_stl.replace('_{}_x0_z0.stl'.format(voxels_dim), '.off')
+            stl_ext = '.off'
+            # and another hack to handle ShapeNet
+            if 'ShapeNet' in path_stl and not os.path.exists(path_stl):
+                path_stl = os.path.join(basedir, 'model_normalized.obj')
+                stl_ext = '.obj'
     path_voxels = os.path.join(basedir, name + '.binvox')
     
     # build output paths; check if work is already done
@@ -136,9 +141,10 @@ def recon_and_save_object(obj, dest_dir, vaegan):
 
     # perform reconstruction
     obj_voxels = read_voxel_array(path_voxels).data
-    obj_voxels = np.reshape(obj_voxels, (-1, 32, 32, 32, 1))
+    print(path_voxels)
+    obj_voxels = np.reshape(obj_voxels, (-1, voxels_dim, voxels_dim, voxels_dim, 1))
     recon_voxels = vaegan.reconstruct(obj_voxels)
-    recon_voxels = np.reshape(recon_voxels, [32, 32, 32])
+    recon_voxels = np.reshape(recon_voxels, [voxels_dim, voxels_dim, voxels_dim])
     recon_print = recon_voxels > .9
     recon_stl = convert_voxels_to_stl(recon_print)
 
@@ -160,10 +166,10 @@ def main():
 
     ### model to use for reconstruction
 
-    vae_modelnet10 = '/home/jcworkma/jack/3d-form/models/voxel_vae_modelnet10_200epochs_1'
+    vae_modelnet10 = '/home/jcworkma/jack/3d-form/models/voxel_vae_modelnet10_64_130epochs'
     model_root = os.path.join(PROJECT_ROOT, vae_modelnet10)
     model_cfg = read_json_data(os.path.join(model_root, 'cfg.json'))
-    model_ckpt = os.path.join(model_root, 'model_epoch-179.ckpt')
+    model_ckpt = os.path.join(model_root, 'model_epoch-129.ckpt')
     #model_ckpt = os.path.join(model_root, 'model_epoch-_end.ckpt')
     logging.info('model_cfg: {}'.format(model_cfg))
     logging.info('model_ckpt: {}'.format(model_ckpt))
@@ -172,42 +178,49 @@ def main():
 
     vaegan = VoxelVaegan.initFromCfg(model_cfg)
     vaegan.restore(model_ckpt)
+    print()
+    print()
 
     ### Good Recons
 
     dest_dir = os.path.join(DEMOS_DIR, 'good_reconstructions')
     os.makedirs(dest_dir, exist_ok=True)
-    target = len(demos.GOOD_RECONS)
-    for i, path_voxels in enumerate(demos.GOOD_RECONS):
-        name = recon_and_save_object(path_voxels, dest_dir, vaegan)
+    good_recons = demos.good_recons_list(voxels_dim=VOXELS_DIM)
+    target = len(good_recons)
+    print(good_recons)
+    for i, path_voxels in enumerate(good_recons):
+        name = recon_and_save_object(path_voxels, dest_dir, vaegan, voxels_dim=VOXELS_DIM)
         logging.info('Completed #{}/{}: {}'.format(i, target, name))
 
     ### Bad Recons
     
     dest_dir = os.path.join(DEMOS_DIR, 'bad_reconstructions')
     os.makedirs(dest_dir, exist_ok=True)
-    target = len(demos.BAD_RECONS)
-    for path_voxels in demos.BAD_RECONS:
+    bad_recons = demos.bad_recons_list(voxels_dim=VOXELS_DIM)
+    target = len(bad_recons)
+    for path_voxels in bad_recons:
         logging.debug(path_voxels)
-        name = recon_and_save_object(path_voxels, dest_dir, vaegan)
+        name = recon_and_save_object(path_voxels, dest_dir, vaegan, voxels_dim=VOXELS_DIM)
         logging.info('Completed #{}/{}: {}'.format(i, target, name))
 
     ### Good Combos
         
     dest_dir = os.path.join(DEMOS_DIR, 'good_combos')
     os.makedirs(dest_dir, exist_ok=True)
-    target = len(demos.GOOD_RECONS)
-    for i, (path_voxels1, path_voxels2) in enumerate(demos.GOOD_COMBOS):
-        combod = combine_and_save_objects(path_voxels1, path_voxels2, dest_dir, vaegan)
+    good_combos = demos.good_combos_list(voxels_dim=VOXELS_DIM)
+    target = len(good_combos)
+    for i, (path_voxels1, path_voxels2) in enumerate(good_combos):
+        combod = combine_and_save_objects(path_voxels1, path_voxels2, dest_dir, vaegan, voxels_dim=VOXELS_DIM)
         logging.info('Completed #{}/{}: {}'.format(i, target, combod))
 
     ### Bad Combos
         
     dest_dir = os.path.join(DEMOS_DIR, 'bad_combos')
     os.makedirs(dest_dir, exist_ok=True)
-    target = len(demos.BAD_COMBOS)
-    for i, (path_voxels1, path_voxels2) in enumerate(demos.BAD_COMBOS):
-        combod = combine_and_save_objects(path_voxels1, path_voxels2, dest_dir, vaegan)
+    bad_combos = demos.bad_combos_list(voxels_dim=VOXELS_DIM)
+    target = len(bad_combos)
+    for i, (path_voxels1, path_voxels2) in enumerate(bad_combos):
+        combod = combine_and_save_objects(path_voxels1, path_voxels2, dest_dir, vaegan, voxels_dim=VOXELS_DIM)
         logging.info('Completed #{}/{}: {}'.format(i, target, combod))
 
     return

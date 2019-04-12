@@ -40,10 +40,10 @@ ROTATE_CATEGORIES = ['sofa', 'monitor', 'dresser']
 get_logger()
 
 
-def encode(path, input1, vaegan):
+def encode(path, input1, vaegan, voxels_dim=VOXELS_DIM):
     if any(cat in path for cat in ROTATE_CATEGORIES):
         input1 = np.rot90(input1)
-    input1 = np.reshape(input1, (-1, VOXELS_DIM, VOXELS_DIM, VOXELS_DIM, 1))
+    input1 = np.reshape(input1, (-1, voxels_dim, voxels_dim, voxels_dim, 1))
     latent1 = vaegan.encode(input1)
     return latent1
 
