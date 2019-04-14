@@ -22,6 +22,7 @@ def convert(fext, fpath, readfunc, plotfunc):
             data = readfunc()
             fig = plotfunc(data, figsize=FIGSIZE)
             fig.savefig(dest)
+            fig.close('all')
             count = 1
     return count
     
@@ -29,7 +30,12 @@ def convert(fext, fpath, readfunc, plotfunc):
 def main():
     count = 0
     all_files = os.listdir(root_dir)
-    file_count = len(all_files)
+    file_count = 0
+    # how many are we doing?
+    for i, f in enumerate(all_files):
+        root2 = os.path.join(root_dir, f)
+        file_count += len(os.listdir(root2))
+    # now do the conversions
     for i, f in enumerate(all_files):
         root2 = os.path.join(root_dir, f)
         # go two levels deep
