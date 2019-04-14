@@ -1,5 +1,6 @@
 .3d-form
 src/demos.zip
+src/reports
 data/external/*
 !data/external/Bear.stl
 data/raw/*
