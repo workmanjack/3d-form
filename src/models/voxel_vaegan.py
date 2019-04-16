@@ -3,6 +3,7 @@ from utils import elapsed_time, memory
 
 
 # python & package imports
+import tensorflow.contrib.slim as slim
 from collections import defaultdict
 import tensorflow as tf
 import logging.config
@@ -1106,6 +1107,11 @@ class VoxelVaegan():
         title = '' if not name else ': {}'.format(name)
         plot_voxels(original_x, title='Original' + title)
         plot_voxels(reconstructed_x, title='Autoencoded' + title)
+        return
+    
+    def model_summary(self):
+        model_vars = tf.trainable_variables()
+        slim.model_analyzer.analyze_vars(model_vars, print_info=True)
         return
 
     def __repr__(self):
