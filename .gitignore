@@ -1,4 +1,6 @@
 .3d-form
+src/demos.zip
+src/reports
 data/external/*
 !data/external/Bear.stl
 data/raw/*
@@ -15,6 +17,8 @@ __pycache__
 *.sublime-workspace
 *.ipynb_checkpoints
 notebooks/cynthia/*
+reports/demos/experiment_review
+reports/demos/interesting_combos
 # ignore until ready to share
 models/stl_rnn
 models/stl_vae
