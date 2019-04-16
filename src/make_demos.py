@@ -166,10 +166,10 @@ def main():
 
     ### model to use for reconstruction
 
-    vae_modelnet10 = '/home/jcworkma/jack/3d-form/models/voxel_vae_modelnet10_64_130epochs'
+    vae_modelnet10 = '/home/jcworkma/jack/3d-form/models/voxel_vae_modelnet10_64_200epochs'
     model_root = os.path.join(PROJECT_ROOT, vae_modelnet10)
     model_cfg = read_json_data(os.path.join(model_root, 'cfg.json'))
-    model_ckpt = os.path.join(model_root, 'model_epoch-129.ckpt')
+    model_ckpt = os.path.join(model_root, 'model_epoch-_end.ckpt')
     #model_ckpt = os.path.join(model_root, 'model_epoch-_end.ckpt')
     logging.info('model_cfg: {}'.format(model_cfg))
     logging.info('model_ckpt: {}'.format(model_ckpt))
