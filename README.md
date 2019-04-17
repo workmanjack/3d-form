@@ -23,11 +23,11 @@ This project utilized a 3D Voxel-Based VAE capable of learning and reconstructin
 
 **Original**
 
-![original toilet](reports/demos/good_reconstructions/toilet_0397_64_x0_z0.orig.png)
+![original toilet](https://raw.githubusercontent.com/workmanjack/3d-form/tf-gpu/reports/demos/good_reconstructions/toilet_0397_64_x0_z0.orig.png)
 
 **Reconstruction**
 
-![reconstructed toilet](reports/demos/good_reconstructions/toilet_0397_64_x0_z0.recon.binvox.png)
+![reconstructed toilet](https://raw.githubusercontent.com/workmanjack/3d-form/tf-gpu/reports/demos/good_reconstructions/toilet_0397_64_x0_z0.recon.binvox.png)
 
 For more information on our technical process, please review our [final presentation](reports/3d-mesh-mash-final-presentation.pdf).
 
