@@ -84,7 +84,7 @@ PyYAML==3.13
 pyzmq==17.1.2
 qtconsole==4.4.3
 requests==2.21.0
-rsa==3.4.2
+rsa==4.1
 s3transfer==0.1.13
 sacred==0.7.4
 scikit-image==0.14.2
