@@ -2,7 +2,7 @@ absl-py==0.7.0
 alabaster==0.7.12
 astor==0.7.1
 awscli==1.16.94
-Babel==2.6.0
+Babel==2.9.1
 backcall==0.1.0
 bleach==3.1.0
 botocore==1.12.84
