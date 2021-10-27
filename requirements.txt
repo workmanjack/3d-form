@@ -13,7 +13,7 @@ cloudpickle==0.7.0
 colorama==0.4.1
 coverage==4.5.2
 cycler==0.10.0
-dask==1.1.1
+dask==2021.10.0
 decorator==4.3.2
 defusedxml==0.5.0
 docopt==0.6.2
